@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX `unlocks_user_resource_unique` ON `unlocks` (`user_id`,`resource_type`,`resource_id`);

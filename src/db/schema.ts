@@ -24,6 +24,79 @@ export const users = sqliteTable('users', {
   updatedAt: text('updated_at').notNull().default(sql`(datetime('now'))`),
 });
 
+// ─── Photography planning ───
+// Catalogue places are broad, illustrative entries. Precise geometry lives in
+// owner-scoped points and is never promoted to verified by a user submission.
+export const places = sqliteTable('places', {
+  id: text('id').primaryKey(),
+  catalogueId: text('catalogue_id').notNull().unique(),
+  name: text('name').notNull(),
+  province: text('province').notNull(),
+  status: text('status', { enum: ['illustrative'] }).notNull().default('illustrative'),
+  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+});
+
+export const vantagePoints = sqliteTable('vantage_points', {
+  id: text('id').primaryKey(),
+  ownerId: text('owner_id').notNull().references(() => users.id),
+  placeId: text('place_id').notNull().references(() => places.id),
+  name: text('name').notNull(),
+  longitude: real('longitude').notNull(),
+  latitude: real('latitude').notNull(),
+  coordinateSystem: text('coordinate_system').notNull().default('WGS84-assumed'),
+  source: text('source', { enum: ['catalogue_estimate', 'user_input', 'gps', 'legacy_import'] }).notNull(),
+  horizontalAccuracyM: real('horizontal_accuracy_m'),
+  elevationM: real('elevation_m'),
+  verticalDatum: text('vertical_datum', { enum: ['unknown', 'WGS84_ellipsoid', 'EGM96'] }).notNull().default('unknown'),
+  cameraHeightM: real('camera_height_m'),
+  verifiedAt: text('verified_at'),
+  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+});
+
+export const subjects = sqliteTable('subjects', {
+  id: text('id').primaryKey(),
+  ownerId: text('owner_id').notNull().references(() => users.id),
+  placeId: text('place_id').notNull().references(() => places.id),
+  name: text('name').notNull(),
+  longitude: real('longitude').notNull(),
+  latitude: real('latitude').notNull(),
+  coordinateSystem: text('coordinate_system').notNull().default('WGS84-assumed'),
+  source: text('source', { enum: ['user_input', 'gps', 'legacy_import'] }).notNull(),
+  horizontalAccuracyM: real('horizontal_accuracy_m'),
+  elevationM: real('elevation_m'),
+  verticalDatum: text('vertical_datum', { enum: ['unknown', 'WGS84_ellipsoid', 'EGM96'] }).notNull().default('unknown'),
+  heightAboveGroundM: real('height_above_ground_m'),
+  verifiedAt: text('verified_at'),
+  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+});
+
+export const shootingPlans = sqliteTable('shooting_plans', {
+  id: text('id').primaryKey(),
+  ownerId: text('owner_id').notNull().references(() => users.id),
+  placeId: text('place_id').notNull().references(() => places.id),
+  vantagePointId: text('vantage_point_id').notNull().references(() => vantagePoints.id),
+  subjectId: text('subject_id').references(() => subjects.id),
+  title: text('title').notNull(),
+  version: integer('version').notNull().default(2),
+  coordinateSource: text('coordinate_source', { enum: ['catalogue', 'user'] }).notNull().default('user'),
+  shotAt: text('shot_at').notNull(),
+  timeZone: text('time_zone').notNull(),
+  focalLengthMm: real('focal_length_mm').notNull(),
+  sensor: text('sensor', { enum: ['fullFrame', 'apsc', 'm43'] }).notNull(),
+  portrait: integer('portrait', { mode: 'boolean' }).notNull(),
+  azimuth: real('azimuth').notNull(),
+  elevation: real('elevation').notNull(),
+  travelMinutes: integer('travel_minutes'),
+  setupMinutes: integer('setup_minutes').notNull(),
+  notes: text('notes').notNull().default(''),
+  dataVersion: text('data_version').notNull(),
+  legacyFingerprint: text('legacy_fingerprint'),
+  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+  updatedAt: text('updated_at').notNull().default(sql`(datetime('now'))`),
+}, (table) => [
+  uniqueIndex('shooting_plans_owner_legacy_unique').on(table.ownerId, table.legacyFingerprint),
+]);
+
 // ─── Photos (user-uploaded works) ───
 export const photos = sqliteTable('photos', {
   id: text('id').primaryKey(),

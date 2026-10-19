@@ -11,6 +11,9 @@ if (!process.env.AUTH_SECRET) {
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   secret: process.env.AUTH_SECRET,
+  // Auth.js no longer treats the legacy NEXTAUTH_URL as sufficient to trust
+  // the canonical host. This app pins that URL in deployment configuration.
+  trustHost: Boolean(process.env.AUTH_URL || process.env.NEXTAUTH_URL),
   session: { strategy: 'jwt' },
   pages: {
     signIn: '/auth/login',

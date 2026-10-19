@@ -1,0 +1,1 @@
+ALTER TABLE `shooting_plans` ADD `coordinate_source` text DEFAULT 'user' NOT NULL;

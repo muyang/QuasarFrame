@@ -6,9 +6,10 @@ import type { Location } from '@/types/location';
 import { useCameraStore } from '@/stores/useCameraStore';
 import { useTimeStore } from '@/stores/useTimeStore';
 import { formatTime } from '@/lib/astronomy';
-import { dateKeyAtLocation } from '@/lib/location-time';
+import { dateKeyAtLocation, locationDateTime } from '@/lib/location-time';
 import { shootingPlanSchema, suggestedDeparture, planToGpx, findAlignmentWindows, type AlignmentWindow, type ShootingPlan } from '@/lib/shooting-plan';
 import { cloudPlanInputSchema, type CloudPlanRecord } from '@/lib/cloud-plan';
+import { terrainAnalysisInputSchema, type TerrainAnalysisResult } from '@/lib/terrain-analysis';
 
 const STORAGE_KEY = 'quasarframe.shooting-plans.v1';
 const numberOrNull = (value: string) => value.trim() ? Number(value) : null;
@@ -29,7 +30,35 @@ function download(name: string, text: string, type: string) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-export function ShootingPlanner({ location }: { location: Location }) {
+function profilePaths(points: NonNullable<TerrainAnalysisResult['profile']>) {
+  const valid = points.filter((point) => point.angleDeg !== null);
+  if (!valid.length) return [];
+  const min = Math.min(...valid.map((point) => point.angleDeg!));
+  const max = Math.max(...valid.map((point) => point.angleDeg!));
+  const span = Math.max(2, max - min);
+  const maxDistance = points[points.length - 1].distanceM;
+  const segments: string[] = [];
+  let current: string[] = [];
+  for (const point of points) {
+    if (point.angleDeg === null) {
+      if (current.length > 1) segments.push(current.join(' '));
+      current = [];
+      continue;
+    }
+    const x = 20 + 600 * point.distanceM / maxDistance;
+    const y = 125 - 105 * (point.angleDeg - min) / span;
+    current.push(`${x.toFixed(1)},${y.toFixed(1)}`);
+  }
+  if (current.length > 1) segments.push(current.join(' '));
+  return segments;
+}
+
+function visibilityText(result?: { status: string; clear?: boolean; marginDeg?: number }) {
+  if (!result || result.status !== 'theoretical') return '覆盖不足，无法判断';
+  return `${result.clear ? '理论无遮挡' : '理论受地形遮挡'}（角度余量 ${result.marginDeg?.toFixed(2)}°）`;
+}
+
+export function ShootingPlanner({ location, onVantageChange }: { location: Location; onVantageChange?: (locationId: string, coordinates: [number, number] | null) => void }) {
   const camera = useCameraStore();
   const time = useTimeStore();
   const [name, setName] = useState(`${location.name}拍摄计划`);
@@ -42,7 +71,7 @@ export function ShootingPlanner({ location }: { location: Location }) {
   const [vantageSource, setVantageSource] = useState<'user_input' | 'gps'>('user_input');
   const [vantageAccuracy, setVantageAccuracy] = useState('');
   const [vantageElevation, setVantageElevation] = useState('');
-  const [vantageDatum, setVantageDatum] = useState<'unknown' | 'WGS84_ellipsoid' | 'EGM96'>('unknown');
+  const [vantageDatum, setVantageDatum] = useState<'unknown' | 'WGS84_ellipsoid' | 'EGM96' | 'EGM2008'>('unknown');
   const [cameraHeight, setCameraHeight] = useState('');
   const [subjectName, setSubjectName] = useState('');
   const [subjectSource, setSubjectSource] = useState<'user_input' | 'gps'>('user_input');
@@ -50,7 +79,7 @@ export function ShootingPlanner({ location }: { location: Location }) {
   const [subjectLatitude, setSubjectLatitude] = useState('');
   const [subjectAccuracy, setSubjectAccuracy] = useState('');
   const [subjectElevation, setSubjectElevation] = useState('');
-  const [subjectDatum, setSubjectDatum] = useState<'unknown' | 'WGS84_ellipsoid' | 'EGM96'>('unknown');
+  const [subjectDatum, setSubjectDatum] = useState<'unknown' | 'WGS84_ellipsoid' | 'EGM96' | 'EGM2008'>('unknown');
   const [subjectHeight, setSubjectHeight] = useState('');
   const [saved, setSaved] = useState<CloudPlanRecord[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -58,6 +87,16 @@ export function ShootingPlanner({ location }: { location: Location }) {
   const [body, setBody] = useState<'sun' | 'moon'>('sun');
   const [tolerance, setTolerance] = useState('1');
   const [result, setResult] = useState<{ windows: AlignmentWindow[]; plan: ShootingPlan; body: string; tolerance: number } | null>(null);
+  const [terrainResult, setTerrainResult] = useState<{ analysis: TerrainAnalysisResult; plan: ShootingPlan } | null>(null);
+  const [terrainBusy, setTerrainBusy] = useState(false);
+
+  useEffect(() => {
+    const lng = Number(longitude), lat = Number(latitude);
+    const coordinates: [number, number] | null = longitude.trim() && latitude.trim() &&
+      Number.isFinite(lng) && Number.isFinite(lat) && lng >= -180 && lng <= 180 && lat >= -90 && lat <= 90
+      ? [lng, lat] : null;
+    onVantageChange?.(location.id, coordinates);
+  }, [longitude, latitude, location.id, onVantageChange]);
 
   useEffect(() => {
     let active = true;
@@ -129,6 +168,35 @@ export function ShootingPlanner({ location }: { location: Location }) {
       setMessage(`已导入 ${result.imported} 份旧计划，跳过 ${result.skipped} 份；坐标均标记为未核验。旧浏览器副本已保留。`);
     } catch (error) { setMessage(error instanceof z.ZodError ? '旧版计划格式有误，未导入' : error instanceof Error ? error.message : '导入失败'); }
   }
+  async function analyzeRealTerrain() {
+    setTerrainBusy(true);
+    try {
+      const plan = readPlan();
+      const input = readCloudInput(plan);
+      const request = terrainAnalysisInputSchema.parse({
+        vantage: {
+          coordinates: plan.coordinates, coordinateSource: plan.coordinateSource,
+          cameraHeightM: input.vantage.cameraHeightM ?? 1.6,
+          elevationM: input.vantage.elevationM, verticalDatum: input.vantage.verticalDatum,
+        },
+        subject: input.subject ? {
+          coordinates: input.subject.coordinates, heightAboveGroundM: input.subject.heightAboveGroundM ?? 0,
+          elevationM: input.subject.elevationM, verticalDatum: input.subject.verticalDatum,
+        } : null,
+        azimuthDeg: plan.azimuth,
+        at: locationDateTime(plan.dateKey, plan.minutes, plan.timeZone).toISOString(),
+      });
+      const analysis = await apiJson<TerrainAnalysisResult>(`/api/terrain/${encodeURIComponent(location.id)}/analysis`, {
+        method: 'POST', body: JSON.stringify(request),
+      });
+      setTerrainResult({ analysis, plan });
+      setMessage(analysis.status === 'datum_mismatch' ? '高程基准与 EGM2008 不一致，未输出视线结论'
+        : analysis.status === 'illustrative_coordinate_mismatch' ? '目录示意坐标与地形高程明显不符，请输入实测机位坐标' : '已生成真实高程数据的理论预览；机位和主体仍未核验');
+    } catch (error) {
+      setTerrainResult(null);
+      setMessage(error instanceof z.ZodError ? error.issues[0].message : error instanceof Error ? error.message : '地形分析失败');
+    } finally { setTerrainBusy(false); }
+  }
   function loadRecord(record: CloudPlanRecord) {
     const plan = record.plan;
     const differsFromCatalogue = plan.coordinates[0] !== location.coordinates[0] || plan.coordinates[1] !== location.coordinates[1];
@@ -173,7 +241,7 @@ export function ShootingPlanner({ location }: { location: Location }) {
         <label>机位坐标来源<select value={vantageSource} onChange={(event) => setVantageSource(event.target.value as 'user_input' | 'gps')} className={inputClass}><option value="user_input">手工输入</option><option value="gps">GPS 记录</option></select></label>
         <label>机位水平误差（米）<input type="number" min={0} step="any" value={vantageAccuracy} onChange={(event) => setVantageAccuracy(event.target.value)} placeholder="未知留空" className={inputClass} /></label>
         <label>机位海拔（米）<input type="number" step="any" value={vantageElevation} onChange={(event) => setVantageElevation(event.target.value)} placeholder="未知留空" className={inputClass} /></label>
-        <label>机位高程基准<select value={vantageDatum} onChange={(event) => setVantageDatum(event.target.value as typeof vantageDatum)} className={inputClass}><option value="unknown">未知</option><option value="WGS84_ellipsoid">WGS84 椭球高</option><option value="EGM96">EGM96 正高</option></select></label>
+        <label>机位高程基准<select value={vantageDatum} onChange={(event) => setVantageDatum(event.target.value as typeof vantageDatum)} className={inputClass}><option value="unknown">未知</option><option value="WGS84_ellipsoid">WGS84 椭球高</option><option value="EGM96">EGM96 正高</option><option value="EGM2008">EGM2008 正高</option></select></label>
         <label>相机离地高度（米）<input type="number" min={0} step="any" value={cameraHeight} onChange={(event) => setCameraHeight(event.target.value)} placeholder="未知留空" className={inputClass} /></label>
       </div>
       <div className="grid grid-cols-2 gap-3 pt-3 border-t border-border">
@@ -183,7 +251,7 @@ export function ShootingPlanner({ location }: { location: Location }) {
         <label>主体坐标来源<select value={subjectSource} onChange={(event) => setSubjectSource(event.target.value as 'user_input' | 'gps')} className={inputClass}><option value="user_input">手工输入</option><option value="gps">GPS 记录</option></select></label>
         <label>主体水平误差（米）<input type="number" min={0} step="any" value={subjectAccuracy} onChange={(event) => setSubjectAccuracy(event.target.value)} placeholder="未知留空" className={inputClass} /></label>
         <label>主体海拔（米）<input type="number" step="any" value={subjectElevation} onChange={(event) => setSubjectElevation(event.target.value)} placeholder="未知留空" className={inputClass} /></label>
-        <label>主体高程基准<select value={subjectDatum} onChange={(event) => setSubjectDatum(event.target.value as typeof subjectDatum)} className={inputClass}><option value="unknown">未知</option><option value="WGS84_ellipsoid">WGS84 椭球高</option><option value="EGM96">EGM96 正高</option></select></label>
+        <label>主体高程基准<select value={subjectDatum} onChange={(event) => setSubjectDatum(event.target.value as typeof subjectDatum)} className={inputClass}><option value="unknown">未知</option><option value="WGS84_ellipsoid">WGS84 椭球高</option><option value="EGM96">EGM96 正高</option><option value="EGM2008">EGM2008 正高</option></select></label>
         <label>主体离地高度（米）<input type="number" min={0} step="any" value={subjectHeight} onChange={(event) => setSubjectHeight(event.target.value)} placeholder="未知留空" className={inputClass} /></label>
       </div>
       <p className="text-xs text-muted-foreground pt-2">坐标系统按 WGS84 暂定。填写来源或误差不等于现场核验；后续地形计算需匹配高程基准。</p>
@@ -212,6 +280,32 @@ export function ShootingPlanner({ location }: { location: Location }) {
         } catch (error) { setMessage(error instanceof Error ? error.message : '删除失败'); }
       }}>删除</button>
     </li>)}</ul>}
+    <div className="border-t border-border pt-4 space-y-3">
+      <h4 className="text-sm font-medium">真实高程与理论遮挡</h4>
+      <p className="text-xs text-muted-foreground">按当前机位、方向、日期和可选主体计算。地形数据为地表模型，包含植被与建筑影响；不含现场核验、近景物体或大气折射。高程基准不一致或数据缺失时不给确定结论。</p>
+      <button className={buttonClass} onClick={analyzeRealTerrain} disabled={terrainBusy}>{terrainBusy ? '正在分析…' : '分析真实地形'}</button>
+      {terrainResult && <div className="text-xs space-y-2 border border-border rounded-lg p-3">
+        <p>{terrainResult.plan.name} · {terrainResult.plan.dateKey} · {terrainResult.plan.coordinates.join(', ')} · 方向 {terrainResult.plan.azimuth}°</p>
+        <p>{terrainResult.analysis.dataset} · 高程基准 {terrainResult.analysis.verticalDatum} · 版本 {terrainResult.analysis.dataVersion}</p>
+        {terrainResult.analysis.sampledElevationM !== undefined && <p>机位坐标处地表高程约 {terrainResult.analysis.sampledElevationM.toFixed(0)} 米{terrainResult.analysis.catalogueDifferenceM !== null && terrainResult.analysis.catalogueDifferenceM !== undefined
+          ? `；与目录标注相差约 ${Math.abs(terrainResult.analysis.catalogueDifferenceM)} 米` : ''}。</p>}
+        {terrainResult.analysis.status === 'datum_mismatch' ? <p className="text-amber-600">输入海拔的高程基准与地形 EGM2008 不一致。请换算后再分析，或留空以使用地形采样高程。</p>
+          : terrainResult.analysis.status === 'illustrative_coordinate_mismatch' ? <p className="text-amber-600">此目录坐标仅供示意，地表高程与地点标注明显不符。请填入实测机位坐标，再分析剖面与遮挡。</p>
+          : terrainResult.analysis.status === 'outside_coverage' ? <p>机位不在当前地形覆盖范围内。</p>
+            : <>
+              {terrainResult.analysis.profile && profilePaths(terrainResult.analysis.profile).length > 0 && <svg viewBox="0 0 640 140" role="img" aria-label="沿当前拍摄方向的地形表观仰角剖面" className="w-full h-32 bg-muted/30 rounded">
+                <line x1="20" y1="126" x2="620" y2="126" stroke="currentColor" opacity="0.4" />
+                {profilePaths(terrainResult.analysis.profile).map((points, index) => <polyline key={index} points={points} fill="none" stroke="#16a34a" strokeWidth="2" />)}
+              </svg>}
+              <p>方向地平线：{terrainResult.analysis.horizon?.status === 'sampled' ? `${terrainResult.analysis.horizon.angleDeg?.toFixed(2)}°` : '覆盖不足'}；2 公里外山脊：{terrainResult.analysis.distantRidge?.status === 'sampled' ? `${terrainResult.analysis.distantRidge.angleDeg?.toFixed(2)}°` : '覆盖不足'}。</p>
+              <p>太阳：{visibilityText(terrainResult.analysis.sun?.visibility)}；月亮：{visibilityText(terrainResult.analysis.moon?.visibility)}。</p>
+              {terrainResult.analysis.subject && <p>主体视线：{terrainResult.analysis.subject.status === 'datum_mismatch' ? '高程基准不匹配' : terrainResult.analysis.subject.status === 'theoretical'
+                ? `${terrainResult.analysis.subject.clear ? '理论无遮挡' : '理论受遮挡'}（余量 ${terrainResult.analysis.subject.clearanceDeg?.toFixed(2)}°）` : '覆盖不足或距离不支持'}。</p>}
+              {terrainResult.analysis.status === 'partial_coverage' && <p className="text-amber-600">部分剖面缺少数据，相关遮挡结论已停用。</p>}
+            </>}
+        <p className="font-medium">机位/主体未现场核验；以上均为理论预览，请勿据此判断现场可见性。调整输入后请重新计算。</p>
+      </div>}
+    </div>
     <div className="border-t border-border pt-4 space-y-3">
       <h4 className="text-sm font-medium">日月方向对齐</h4>
       <p className="text-xs text-muted-foreground">以上方机位控制的方位角、仰角作为主体方向，在所选日期寻找对齐窗口。角度容差为天体中心与目标方向的距离；1 分钟采样，未计入山脊遮挡和主体轮廓。</p>

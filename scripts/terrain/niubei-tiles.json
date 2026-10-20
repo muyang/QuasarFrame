@@ -1,0 +1,10 @@
+{
+  "dataset": "Copernicus DEM GLO-30 Public COG 2021",
+  "bounds": [101.72, 29.44, 102.72, 30.32],
+  "tiles": [
+    { "id": "N29_00_E101_00", "sha256": "5d73b9cfa449a52af97d18a103e1f8af0427c9e73bd79f8b1dced9e8f796355e" },
+    { "id": "N29_00_E102_00", "sha256": "2900561cdc013f9b74cf73ef8f9f2abec65c714b51af331a9838eec761c92094" },
+    { "id": "N30_00_E101_00", "sha256": "46ba52e4be8b11409aabd2d8f86e7176bdb8e80d4cc535fc4fbfdc01e5770070" },
+    { "id": "N30_00_E102_00", "sha256": "6f847ad58ac4efef52586cd93a8e44da90e8d1595a64fb473df3ba264fd280bd" }
+  ]
+}

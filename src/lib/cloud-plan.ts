@@ -4,7 +4,7 @@ import { shootingPlanSchema } from './shooting-plan';
 const coordinate = z.tuple([z.number().finite().min(-180).max(180), z.number().finite().min(-90).max(90)]);
 const optionalMeters = z.number().finite().min(0).max(100000).nullable();
 const elevationMeters = z.number().finite().min(-500).max(9000).nullable();
-const verticalDatum = z.enum(['unknown', 'WGS84_ellipsoid', 'EGM96']);
+const verticalDatum = z.enum(['unknown', 'WGS84_ellipsoid', 'EGM96', 'EGM2008']);
 
 export const vantageInputSchema = z.object({
   name: z.string().trim().min(1).max(120),
@@ -41,13 +41,13 @@ export interface CloudPlanRecord {
   vantage: {
     id: string; name: string; source: 'catalogue_estimate' | 'user_input' | 'gps' | 'legacy_import';
     horizontalAccuracyM: number | null; elevationM: number | null;
-    verticalDatum: 'unknown' | 'WGS84_ellipsoid' | 'EGM96'; cameraHeightM: number | null;
+    verticalDatum: 'unknown' | 'WGS84_ellipsoid' | 'EGM96' | 'EGM2008'; cameraHeightM: number | null;
     verifiedAt: string | null;
   };
   subject: ({
     id: string; name: string; coordinates: [number, number]; source: 'user_input' | 'gps' | 'legacy_import';
     horizontalAccuracyM: number | null; elevationM: number | null;
-    verticalDatum: 'unknown' | 'WGS84_ellipsoid' | 'EGM96'; heightAboveGroundM: number | null;
+    verticalDatum: 'unknown' | 'WGS84_ellipsoid' | 'EGM96' | 'EGM2008'; heightAboveGroundM: number | null;
     verifiedAt: string | null;
   }) | null;
   dataVersion: string;

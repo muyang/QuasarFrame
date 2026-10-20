@@ -1,7 +1,7 @@
 'use client';
 
 import { useParams } from 'next/navigation';
-import { useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { ArrowLeft, Mountain, MapPin, Compass, Star } from 'lucide-react';
 import Link from 'next/link';
 import { getLocationById } from '@/data/locations';
@@ -31,12 +31,18 @@ const seasonLabels: Record<string, string> = {
 export default function LocationDetailPage() {
   const params = useParams();
   const location = getLocationById(params.id as string);
+  const [previewVantage, setPreviewVantage] = useState<{ locationId: string; coordinates: [number, number] | null } | null>(null);
+  const onVantageChange = useCallback((locationId: string, coordinates: [number, number] | null) => {
+    setPreviewVantage({ locationId, coordinates });
+  }, []);
+  const effectiveCoordinates: [number, number] = previewVantage && previewVantage.locationId === location?.id && previewVantage.coordinates
+    ? previewVantage.coordinates : location?.coordinates || [105, 35];
 
   const { timeOfDay, setTimeOfDay, dateKey, setDateKey } = useTimeStore();
   const provenance = getLocationProvenance();
   const timeZone = provenance.timeZone;
   const selectedDate = useMemo(() => locationDateTime(dateKey, timeOfDay * 60, timeZone), [dateKey, timeOfDay, timeZone]);
-  const sunMoonData = useSunCalc(location?.coordinates || [105, 35], selectedDate, timeZone);
+  const sunMoonData = useSunCalc(effectiveCoordinates, selectedDate, timeZone);
 
   if (!location) {
     return (
@@ -168,14 +174,12 @@ export default function LocationDetailPage() {
             <div>
               <h3 className="text-lg font-semibold mb-3">构图与光线示意</h3>
               <CameraSimulator
-                coordinates={location.coordinates}
+                locationId={location.id}
+                coordinates={effectiveCoordinates}
                 elevation={location.elevation}
                 timeZone={timeZone}
                 currentDate={selectedDate}
               />
-              <p className="text-xs text-muted-foreground mt-2">
-                程序生成地形，仅用于理解视场与光线；不能据此判断实际山峰、机位或遮挡。
-              </p>
             </div>
 
             {/* Time Slider */}
@@ -192,7 +196,7 @@ export default function LocationDetailPage() {
               />
             </div>
 
-            <ShootingPlanner key={location.id} location={location} />
+            <ShootingPlanner key={location.id} location={location} onVantageChange={onVantageChange} />
             {/* Photo Grid */}
             <div>
               <h3 className="text-lg font-semibold mb-3">示意图片</h3>
@@ -210,7 +214,7 @@ export default function LocationDetailPage() {
 
             {/* Sun Path */}
             <div className="bg-card rounded-xl p-5 border border-border/30">
-              <SunPathDiagram sunMoonData={sunMoonData} timeOfDay={timeOfDay} coordinates={location.coordinates} date={selectedDate} timeZone={timeZone} />
+              <SunPathDiagram sunMoonData={sunMoonData} timeOfDay={timeOfDay} coordinates={effectiveCoordinates} date={selectedDate} timeZone={timeZone} />
             </div>
 
             {/* Golden Hour */}

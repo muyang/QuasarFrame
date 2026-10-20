@@ -12,6 +12,7 @@
     "lint": "eslint src tests scripts",
     "typecheck": "tsc --noEmit --incremental false",
     "test": "node --import tsx --test tests/*.test.ts",
+    "terrain:validate": "node --import tsx scripts/terrain/validate-views.ts",
     "db:generate": "node --env-file-if-exists=.env.local node_modules/drizzle-kit/bin.cjs generate",
     "db:migrate": "node --env-file-if-exists=.env.local node_modules/drizzle-kit/bin.cjs migrate",
     "db:seed": "node --env-file-if-exists=.env.local --import tsx src/db/seed.ts",

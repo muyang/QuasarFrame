@@ -1,6 +1,6 @@
 # QuasarFrame
 
-QuasarFrame is a Next.js prototype for photography planning, location discovery, licensed live views, and digital-frame content. The current 3D terrain is illustrative; the [implementation plan](docs/actionable-code-improvement-plan-2026-10-18.md) describes the real-terrain pilot and delivery milestones.
+QuasarFrame is a Next.js prototype for photography planning, location discovery, licensed live views, and digital-frame content. The Niubei pilot can use a locally built Copernicus GLO-30 terrain grid; other locations retain the labelled illustrative terrain. See the [terrain pilot guide](docs/p2-terrain-pilot.md) and [implementation plan](docs/actionable-code-improvement-plan-2026-10-18.md).
 
 ## Local setup
 
@@ -39,3 +39,7 @@ For an existing database created with `db:push`, first run `npm run db:baseline`
 The seed creates demo accounts with known passwords and demonstration camera feeds. It requires `ALLOW_DEMO_SEED=1` and refuses to run when `NODE_ENV=production`; do not use it for a public instance. Public camera distribution is disabled by default. After verifying redistribution rights for a feed, put its ID in `AUTHORIZED_FEED_IDS` and explicitly allow each upstream origin in `FEED_UPSTREAM_ORIGINS`. The proxy blocks unlisted destinations, redirects, and private network addresses. New feeds remain inactive until an administrator reviews them.
 
 `quasarframe*.db*`, `data/`, `public/uploads/`, `public/cesium/`, and terrain data are local/generated and ignored by Git. Never commit camera credentials, real `.env` files, uploaded originals, or user databases. Mock and unverified online payments are disabled; balance purchases are transactional. Frame-order creation requires a stable `Idempotency-Key` header per checkout attempt. A verified gateway callback, refund workflow, camera licensing records, and paid media policy remain required before public paid launch.
+
+## Niubei terrain pilot
+
+Install Python 3 with NumPy and Rasterio, then run `python3 scripts/terrain/build_niubei.py --download`. The four pinned public COGs and generated grid stay in ignored `terrain-data/`; the app loads them at startup. The process and field validation format are in [docs/p2-terrain-pilot.md](docs/p2-terrain-pilot.md). Without this local grid, the page labels its procedural 3D view as illustrative.

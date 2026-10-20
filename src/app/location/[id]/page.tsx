@@ -208,7 +208,7 @@ export default function LocationDetailPage() {
           {/* Right sidebar — Astronomy + Controls */}
           <div className="space-y-6">
             {/* Camera Controls */}
-            <div className="bg-card rounded-xl p-5 border border-border/30 sticky top-24">
+            <div className="bg-card rounded-xl p-5 border border-border/30">
               <CameraControls />
             </div>
 

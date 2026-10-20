@@ -2,6 +2,17 @@
 
 本阶段把照片接入“读证据 → 人工确认 → 地形对照 → 建立拍摄计划”的流程。设计参考 [Geo-Sleuth](https://github.com/Oldcircle/geo-sleuth) 的逐项证据与候选排序思路；没有复制其代码，也没有把它的 Agent Skill 当成 Web API。该项目采用 [MIT 许可](https://github.com/Oldcircle/geo-sleuth/blob/main/LICENSE)，其完整工作流还依赖 OSM、参考影像、OCR、模型和人工判断，不能仅凭一张无信息照片承诺精确定位。
 
+## Geo-Sleuth 思路在本项目中的位置
+
+| 参考思路 | 本项目实现 | 边界 |
+| --- | --- | --- |
+| 分离可核验的照片证据 | `src/server/photo-evidence.ts` 解析原图；`src/lib/photo-evidence.ts` 规范化 EXIF 并记录坐标、朝向、时间和参数来源；`src/app/api/photos/analyze/route.ts` 返回分析结果 | 目前只读取元数据，不从画面自动识别地物或坐标 |
+| 人工确认后再使用证据 | `src/app/upload/page.tsx` 显示证据并由用户点选填入；`src/app/api/photos/route.ts` 保存来源；`src/lib/photo-privacy.ts` 控制精确机位披露 | 来源记录不是真实性认证 |
+| 限定区域的候选比对 | `src/lib/skyline-match.ts` 将人工标出的远山脊与真实 DEM 比较；`src/app/api/terrain/[locationId]/skyline-match/route.ts` 返回候选、误差和低可信度标记 | 必须输入大致区域和朝向；没有全球自动地理定位 |
+| 地形校准与拍摄计划 | `src/lib/photo-calibration.ts` 估算仰角；`src/components/camera/PhotoRidgeCalibration.tsx` 展示人工标点和结果；`src/components/camera/ShootingPlanner.tsx` 接入计划 | 缺少现场已知机位照片的精度验证 |
+
+Geo-Sleuth 的 OCR、OSM 地物约束、参考影像检索及多模态模型推理尚未接入；仓库中没有它的代码副本、服务调用或模型权重。
+
 ## 已实现
 
 - 上传页在文件保存前调用 `POST /api/photos/analyze`，服务端检查图片内容并读取 EXIF GPS、真北朝向、相机/镜头、实际焦距、曝光与相机本地时间。结果先展示，用户点击后才填入空白表单项；无 GPS 时不生成假坐标。相机时间不再强行转成 UTC。

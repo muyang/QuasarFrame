@@ -1,28 +1,11 @@
 'use client';
 
-import { useRef, useEffect, useState } from 'react';
-import dynamic from 'next/dynamic';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLocationStore } from '@/stores/useLocationStore';
 import { locations } from '@/data/locations';
 import type { Location } from '@/types/location';
-
-// Dynamically imported Cesium globe (no SSR)
-const CesiumViewer = dynamic(
-  () => import('./CesiumViewer'),
-  { ssr: false, loading: () => <GlobeSkeleton /> }
-);
-
-function GlobeSkeleton() {
-  return (
-    <div className="absolute inset-0 flex items-center justify-center bg-background">
-      <div className="text-center">
-        <div className="w-16 h-16 mx-auto rounded-full border-4 border-primary/20 border-t-primary animate-spin mb-4" />
-        <p className="text-muted-foreground text-sm">加载数字地球…</p>
-      </div>
-    </div>
-  );
-}
+import CesiumViewer from './CesiumViewer';
 
 export function CesiumGlobe() {
   const router = useRouter();

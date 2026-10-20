@@ -14,6 +14,7 @@ export interface UseCesiumOptions {
 
 export interface CesiumApi {
   viewer: CesiumViewer | null;
+  error: string | null;
   flyTo: (location: Location) => void;
   addMarkers: (locations: Location[], onClick?: (loc: Location) => void) => void;
   clearMarkers: () => void;
@@ -27,6 +28,7 @@ export function useCesium(
   const markersRef = useRef<CesiumEntity[]>([]);
   const handlerRef = useRef<CesiumEventHandler | null>(null);
   const [viewer, setViewer] = useState<CesiumViewer | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -53,7 +55,13 @@ export function useCesium(
 
       try {
         const viewer = new Cesium.Viewer(containerRef.current, {
-          // No Ion-dependent terrain — use ellipsoid (works without token)
+          // A local grid keeps the globe visible without Cesium ion or an
+          // external imagery service. Detailed terrain belongs to the place view.
+          baseLayer: new Cesium.ImageryLayer(new Cesium.GridImageryProvider({
+            color: new Cesium.Color(0.34, 0.58, 0.72, 0.52),
+            glowColor: new Cesium.Color(0.25, 0.65, 0.9, 0.12),
+            backgroundColor: new Cesium.Color(0.06, 0.14, 0.24, 1),
+          })),
           baseLayerPicker: false,
           geocoder: false,
           homeButton: false,
@@ -78,20 +86,28 @@ export function useCesium(
         // Error handling — log but don't crash
         viewer.scene.renderError.addEventListener((_scene: unknown, error: unknown) => {
           console.warn('[Cesium] Render error:', error);
+          setError('当前设备无法渲染三维地球');
         });
 
         // Style the globe dark to match theme
-        viewer.scene.globe.baseColor = Cesium.Color.fromCssColorString('#0a0a1a');
+        viewer.scene.globe.baseColor = Cesium.Color.fromCssColorString('#142b45');
         viewer.scene.backgroundColor = Cesium.Color.fromCssColorString('#0a0a0f');
 
         viewerRef.current = viewer;
         setViewer(viewer);
+        setError(null);
       } catch (err) {
         console.error('[Cesium] Failed to initialize viewer:', err);
+        setError('三维地球初始化失败');
       }
     };
 
-    init();
+    init().catch((err) => {
+      if (!destroyed) {
+        console.error('[Cesium] Failed to load viewer:', err);
+        setError('三维地球资源加载失败');
+      }
+    });
 
     return () => {
       destroyed = true;
@@ -207,6 +223,7 @@ export function useCesium(
 
   return {
     viewer,
+    error,
     flyTo,
     addMarkers,
     clearMarkers,

@@ -1,6 +1,6 @@
 # QuasarFrame
 
-QuasarFrame is a Next.js prototype for photography planning, location discovery, licensed live views, and digital-frame content. The Niubei pilot can use a locally built Copernicus GLO-30 terrain grid; other locations retain the labelled illustrative terrain. See the [terrain pilot guide](docs/p2-terrain-pilot.md) and [implementation plan](docs/actionable-code-improvement-plan-2026-10-18.md).
+QuasarFrame is a Next.js prototype for photography planning, location discovery, licensed live views, and digital-frame content. The Niubei pilot can use a locally built Copernicus GLO-30 terrain grid; other locations retain the labelled illustrative terrain. See the [terrain pilot guide](docs/p2-terrain-pilot.md), [photo assistant guide](docs/p3-photo-assistant.md), and [implementation plan](docs/actionable-code-improvement-plan-2026-10-18.md).
 
 ## Local setup
 

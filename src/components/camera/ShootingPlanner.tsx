@@ -10,8 +10,19 @@ import { dateKeyAtLocation, locationDateTime } from '@/lib/location-time';
 import { shootingPlanSchema, suggestedDeparture, planToGpx, findAlignmentWindows, type AlignmentWindow, type ShootingPlan } from '@/lib/shooting-plan';
 import { cloudPlanInputSchema, type CloudPlanRecord } from '@/lib/cloud-plan';
 import { terrainAnalysisInputSchema, type TerrainAnalysisResult } from '@/lib/terrain-analysis';
+import { PhotoRidgeCalibration } from './PhotoRidgeCalibration';
 
 const STORAGE_KEY = 'quasarframe.shooting-plans.v1';
+const PHOTO_PLAN_KEY = 'quasarframe.photo-plan.v1';
+const photoPlanTransfer = z.object({
+  locationId: z.string(),
+  photoId: z.string().min(1).max(100),
+  coordinates: z.tuple([z.number().min(-180).max(180), z.number().min(-90).max(90)]).nullable(),
+  azimuth: z.number().min(0).max(360).nullable(),
+  elevation: z.number().min(-90).max(90).nullable(),
+  focalLength: z.number().min(1).max(2000).nullable(),
+  sensor: z.enum(['unknown', 'fullFrame', 'apsc', 'm43']),
+});
 const numberOrNull = (value: string) => value.trim() ? Number(value) : null;
 
 async function apiJson<T>(url: string, options?: RequestInit): Promise<T> {
@@ -89,6 +100,30 @@ export function ShootingPlanner({ location, onVantageChange }: { location: Locat
   const [result, setResult] = useState<{ windows: AlignmentWindow[]; plan: ShootingPlan; body: string; tolerance: number } | null>(null);
   const [terrainResult, setTerrainResult] = useState<{ analysis: TerrainAnalysisResult; plan: ShootingPlan } | null>(null);
   const [terrainBusy, setTerrainBusy] = useState(false);
+  const [referencePhotoUrl, setReferencePhotoUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const raw = sessionStorage.getItem(PHOTO_PLAN_KEY);
+      if (!raw) return;
+      try {
+        const transfer = photoPlanTransfer.parse(JSON.parse(raw));
+        if (transfer.locationId !== location.id) return;
+        sessionStorage.removeItem(PHOTO_PLAN_KEY);
+        if (transfer.coordinates) {
+          setLongitude(String(transfer.coordinates[0]));
+          setLatitude(String(transfer.coordinates[1]));
+        }
+        if (transfer.azimuth !== null) camera.setAzimuth(transfer.azimuth);
+        if (transfer.elevation !== null) camera.setElevation(transfer.elevation);
+        if (transfer.focalLength !== null) camera.setFocalLength(transfer.focalLength);
+        if (transfer.sensor !== 'unknown') camera.setSensor(transfer.sensor);
+        setReferencePhotoUrl(`/api/photos/${encodeURIComponent(transfer.photoId)}/image`);
+        setMessage('已载入照片提供的待核验参数；请核对机位、拍摄时间和镜头尺寸后再分析');
+      } catch { sessionStorage.removeItem(PHOTO_PLAN_KEY); }
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [location.id, camera.setAzimuth, camera.setElevation, camera.setFocalLength, camera.setSensor]);
 
   useEffect(() => {
     const lng = Number(longitude), lat = Number(latitude);
@@ -323,6 +358,10 @@ export function ShootingPlanner({ location, onVantageChange }: { location: Locat
         <p>结果对应计算时的输入快照，调整参数后请重新计算。当前不判断现场可见性。</p>
       </div>}
     </div>
+    <PhotoRidgeCalibration key={referencePhotoUrl ?? location.id} locationId={location.id} readPlan={readPlan}
+      initialPhotoUrl={referencePhotoUrl}
+      focalLengthMm={camera.focalLength} sensor={camera.sensor} portrait={camera.portrait}
+      onApplyTilt={camera.setElevation} />
     <p role="status" className="text-xs text-muted-foreground">{message}</p>
   </section>;
 }

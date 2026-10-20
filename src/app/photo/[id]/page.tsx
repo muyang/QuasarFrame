@@ -10,6 +10,8 @@ import {
   Eye, Heart, ArrowLeft, CheckCircle, Globe
 } from 'lucide-react';
 import { ShootingPositionIndicator } from '@/components/photos/ShootingPositionIndicator';
+import { shootingGuidance, type PhotoProvenance } from '@/lib/photo-evidence';
+import { getCameraView, type SensorPreset } from '@/lib/camera-optics';
 
 interface PhotoDetail {
   id: string;
@@ -30,8 +32,11 @@ interface PhotoDetail {
   shutterSpeed: string | null;
   iso: number | null;
   focalLength: number | null;
+  sensorFormat: 'unknown' | SensorPreset;
   azimuth: number | null;
   elevation: number | null;
+  shareCoordinates: boolean;
+  provenance: PhotoProvenance;
   priceType: 'free' | 'paid';
   price: number;
   downloadCount: number;
@@ -107,6 +112,27 @@ export default function PhotoDetailPage() {
   }
 
   const needsUnlock = photo.priceType === 'paid' && !photo.isUnlocked && !photo.isOwner;
+  const guidance = shootingGuidance({
+    coordinates: photo.coordinatesLng !== null && photo.coordinatesLat !== null
+      ? [photo.coordinatesLng, photo.coordinatesLat] : null,
+    azimuthDeg: photo.azimuth, focalLengthMm: photo.focalLength,
+    shutterSpeed: photo.shutterSpeed, iso: photo.iso,
+  });
+  const view = photo.focalLength && photo.sensorFormat !== 'unknown'
+    ? getCameraView(photo.focalLength, photo.sensorFormat, false) : null;
+
+  function openPhotoPlan() {
+    if (!photo || !photo.locationId) return;
+    const selected = photo;
+    const destination = photo.locationId;
+    sessionStorage.setItem('quasarframe.photo-plan.v1', JSON.stringify({ locationId: destination,
+      photoId: selected.id,
+      coordinates: selected.coordinatesLng !== null && selected.coordinatesLat !== null
+        ? [selected.coordinatesLng, selected.coordinatesLat] : null,
+      azimuth: selected.azimuth, elevation: selected.elevation,
+      focalLength: selected.focalLength, sensor: selected.sensorFormat }));
+    router.push(`/location/${encodeURIComponent(destination)}`);
+  }
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
@@ -206,6 +232,8 @@ export default function PhotoDetailPage() {
               {photo.focalLength && (
                 <ParamRow icon={<Focus className="w-4 h-4" />} label="焦距" value={`${photo.focalLength}mm`} />
               )}
+              {view && <p className="text-xs text-white/50">按{photo.sensorFormat === 'fullFrame' ? '全画幅' : photo.sensorFormat === 'apsc' ? 'APS-C' : 'M4/3'}估算：水平视角 {view.horizontalFov.toFixed(1)}°，垂直视角 {view.verticalFov.toFixed(1)}°。</p>}
+              <p className="text-xs text-white/40">坐标来源：{photo.provenance.coordinates === 'exif' ? 'EXIF GPS' : photo.provenance.coordinates === 'manual' ? '作者填写' : '未知'}；参数来源：{photo.provenance.settings === 'exif' ? 'EXIF' : photo.provenance.settings === 'manual' ? '作者填写或修改' : '未知'}。均未现场核验。</p>
 
               {(photo.coordinatesLng || photo.azimuth !== null) && (
                 <div className="pt-2 border-t border-white/10">
@@ -233,14 +261,9 @@ export default function PhotoDetailPage() {
             <div className="bg-white/5 border border-white/10 rounded-xl p-4">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-medium text-white/80">机位复现</h3>
-                <Link
-                  href={photo.locationId
-                    ? `/scout?location=${photo.locationId}&azimuth=${photo.azimuth ?? ''}&elevation=${photo.elevation ?? ''}&focalLength=${photo.focalLength ?? ''}`
-                    : `/scout?azimuth=${photo.azimuth ?? ''}&elevation=${photo.elevation ?? ''}&focalLength=${photo.focalLength ?? ''}`}
-                  className="text-xs text-glow hover:underline flex items-center gap-1"
-                >
-                  <Globe className="w-3 h-3" /> 在选景里打开
-                </Link>
+                {photo.locationId && <button onClick={openPhotoPlan} className="text-xs text-glow hover:underline flex items-center gap-1">
+                  <Globe className="w-3 h-3" /> 用此照片制定计划
+                </button>}
               </div>
               <ShootingPositionIndicator
                 azimuth={photo.azimuth}
@@ -262,7 +285,7 @@ export default function PhotoDetailPage() {
                 <ParamRow
                   icon={<Clock className="w-4 h-4" />}
                   label="拍摄时间"
-                  value={new Date(photo.shotAt).toLocaleString('zh-CN')}
+                  value={`${photo.shotAt.replace('T', ' ')}（时区待确认）`}
                 />
               )}
               {photo.weather && (
@@ -270,6 +293,13 @@ export default function PhotoDetailPage() {
               )}
             </div>
           )}
+
+          {photo.isUnlocked && <div className="bg-white/5 border border-white/10 rounded-xl p-4 space-y-2">
+            <h3 className="text-sm font-medium text-white/80">拍摄指导</h3>
+            {guidance.length ? guidance.map((item, index) => <p className="text-xs text-white/60" key={index}>{item}</p>)
+              : <p className="text-xs text-white/60">基本参数已具备；可在拍摄计划中调整时间、方向与地形剖面，现场光线和近景仍需试拍核对。</p>}
+            {photo.isOwner && <p className="text-xs text-white/40">精确机位{photo.shareCoordinates ? '已允许在作品详情分享' : '仅自己可见'}。修改坐标后会重新关闭分享。</p>}
+          </div>}
 
           {/* Location link */}
           {photo.locationId && (

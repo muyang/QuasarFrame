@@ -6,6 +6,8 @@ import { db } from '@/db';
 import { photos } from '@/db/schema';
 import { photoUploadSchema } from '@/lib/validators';
 import { processAndSaveImage } from '@/lib/file-upload';
+import { provenanceForSubmission } from '@/lib/photo-evidence';
+import { analyzePhotoBuffer } from '@/server/photo-evidence';
 
 // POST — Upload new photo (multipart/form-data)
 export async function POST(req: Request) {
@@ -46,9 +48,14 @@ export async function POST(req: Request) {
       }
       metadata = parsed.data;
     }
+    if ((metadata.coordinatesLng == null) !== (metadata.coordinatesLat == null)) {
+      return NextResponse.json({ error: '经度和纬度需同时填写' }, { status: 400 });
+    }
 
     // Process and save image
     const fileBuffer = Buffer.from(await file.arrayBuffer());
+    const { evidence } = await analyzePhotoBuffer(fileBuffer);
+    const provenance = provenanceForSubmission(metadata, evidence);
     const photoId = uuid();
     const { imageUrl, thumbnailUrl } = await processAndSaveImage(fileBuffer, photoId);
 
@@ -61,8 +68,8 @@ export async function POST(req: Request) {
       imageUrl,
       thumbnailUrl,
       locationId: metadata.locationId || null,
-      coordinatesLng: metadata.coordinatesLng || null,
-      coordinatesLat: metadata.coordinatesLat || null,
+      coordinatesLng: metadata.coordinatesLng ?? null,
+      coordinatesLat: metadata.coordinatesLat ?? null,
       shotAt: metadata.shotAt || null,
       weather: metadata.weather || null,
       cameraMake: metadata.cameraMake || null,
@@ -70,11 +77,14 @@ export async function POST(req: Request) {
       lens: metadata.lens || null,
       aperture: metadata.aperture || null,
       shutterSpeed: metadata.shutterSpeed || null,
-      iso: metadata.iso || null,
-      focalLength: metadata.focalLength || null,
-      azimuth: metadata.azimuth || null,
-      elevation: metadata.elevation || null,
-      gpsAccuracy: metadata.gpsAccuracy || null,
+      iso: metadata.iso ?? null,
+      focalLength: metadata.focalLength ?? null,
+      sensorFormat: metadata.sensorFormat || 'unknown',
+      azimuth: metadata.azimuth ?? null,
+      elevation: metadata.elevation ?? null,
+      gpsAccuracy: provenance.coordinates === 'exif' ? evidence.gpsAccuracyM : metadata.gpsAccuracy ?? null,
+      metadataProvenance: JSON.stringify(provenance),
+      shareCoordinates: metadata.shareCoordinates ?? false,
       priceType: metadata.priceType || 'free',
       price: metadata.price || 0,
       status: 'pending',

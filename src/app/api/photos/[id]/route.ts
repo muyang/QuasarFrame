@@ -4,6 +4,8 @@ import { db } from '@/db';
 import { photos, users, unlocks } from '@/db/schema';
 import { requireAuth, getUserId } from '@/auth/middleware';
 import { photoUpdateSchema } from '@/lib/validators';
+import { photoProvenanceSchema } from '@/lib/photo-evidence';
+import { redactPhotoPosition } from '@/lib/photo-privacy';
 
 // GET photo detail
 export async function GET(
@@ -34,9 +36,12 @@ export async function GET(
       shutterSpeed: photos.shutterSpeed,
       iso: photos.iso,
       focalLength: photos.focalLength,
+      sensorFormat: photos.sensorFormat,
       azimuth: photos.azimuth,
       elevation: photos.elevation,
       gpsAccuracy: photos.gpsAccuracy,
+      metadataProvenance: photos.metadataProvenance,
+      shareCoordinates: photos.shareCoordinates,
       priceType: photos.priceType,
       price: photos.price,
       downloadCount: photos.downloadCount,
@@ -93,29 +98,30 @@ export async function GET(
 
   // For paid content, hide full-res URL and shooting params unless unlocked
   const responsePhoto = { ...photo };
+  let provenance = photoProvenanceSchema.parse({});
+  try { provenance = photoProvenanceSchema.parse(JSON.parse(photo.metadataProvenance)); }
+  catch { /* Pre-migration records have no source evidence. */ }
   if (!isUnlocked) {
     responsePhoto.imageUrl = photo.thumbnailUrl; // show thumbnail only
-    responsePhoto.coordinatesLng = null;
-    responsePhoto.coordinatesLat = null;
-    responsePhoto.azimuth = null;
-    responsePhoto.elevation = null;
     responsePhoto.aperture = null;
     responsePhoto.shutterSpeed = null;
     responsePhoto.iso = null;
     responsePhoto.focalLength = null;
   }
-  // Free publishing does not imply consent to disclose a precise shooting position.
-  if (photo.priceType === 'free' && !isOwner && !isAdmin) {
-    responsePhoto.coordinatesLng = null;
-    responsePhoto.coordinatesLat = null;
-    responsePhoto.azimuth = null;
-    responsePhoto.elevation = null;
+  // Payment does not imply consent to disclose a precise shooting position.
+  const positionVisible = isOwner || isAdmin || (isUnlocked && photo.shareCoordinates);
+  if (!positionVisible) {
+    provenance = { ...provenance, coordinates: 'unknown', direction: 'unknown' };
   }
   if (isUnlocked) responsePhoto.imageUrl = `/api/photos/${id}/image`;
+  const safePhoto = redactPhotoPosition(responsePhoto, { ownsPhoto: isOwner,
+    isAdmin, isUnlocked, shareCoordinates: photo.shareCoordinates });
 
   return NextResponse.json({
-    ...responsePhoto,
+    ...safePhoto,
+    metadataProvenance: undefined,
     author,
+    provenance,
     isUnlocked,
     isOwner,
   });
@@ -148,6 +154,22 @@ export async function PATCH(
     }
 
     const updateData: Partial<typeof photos.$inferInsert> = parsed.data;
+    const changedPosition = parsed.data.coordinatesLng !== undefined || parsed.data.coordinatesLat !== undefined;
+    if (changedPosition && (parsed.data.coordinatesLng === undefined || parsed.data.coordinatesLat === undefined)) {
+      return NextResponse.json({ error: '经度和纬度需同时更新' }, { status: 400 });
+    }
+    let provenance = photoProvenanceSchema.parse({});
+    try { provenance = photoProvenanceSchema.parse(JSON.parse(existing.metadataProvenance)); }
+    catch { /* Legacy record. */ }
+    if (changedPosition) {
+      provenance.coordinates = 'manual';
+      if (parsed.data.shareCoordinates === undefined) updateData.shareCoordinates = false;
+    }
+    if (parsed.data.azimuth !== undefined || parsed.data.elevation !== undefined) provenance.direction = 'manual';
+    if (parsed.data.shotAt !== undefined) provenance.captureTime = 'manual';
+    if (['cameraMake', 'cameraModel', 'lens', 'aperture', 'shutterSpeed', 'iso', 'focalLength', 'sensorFormat']
+      .some((field) => field in parsed.data)) provenance.settings = 'manual';
+    updateData.metadataProvenance = JSON.stringify(provenance);
 
     if (Object.keys(updateData).length > 0) {
       await db.update(photos).set(updateData).where(eq(photos.id, id));

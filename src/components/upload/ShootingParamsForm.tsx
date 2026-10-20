@@ -17,8 +17,10 @@ interface ShootingParams {
   shutterSpeed: string;
   iso: string;
   focalLength: string;
+  sensorFormat: 'unknown' | 'fullFrame' | 'apsc' | 'm43';
   azimuth: string;
   elevation: string;
+  shareCoordinates: boolean;
   priceType: 'free' | 'paid';
   price: string;
 }
@@ -29,7 +31,7 @@ interface Props {
 }
 
 export function ShootingParamsForm({ params, onChange }: Props) {
-  function update(field: keyof ShootingParams, value: string) {
+  function update(field: keyof ShootingParams, value: string | boolean) {
     onChange({ ...params, [field]: value });
   }
 
@@ -88,6 +90,9 @@ export function ShootingParamsForm({ params, onChange }: Props) {
             className={inputClass}
           />
         </Field>
+        <label className="flex items-center gap-2 text-xs text-white/60"><input type="checkbox" checked={params.shareCoordinates}
+          onChange={(event) => update('shareCoordinates', event.target.checked)} />允许在作品详情向其他用户展示精确坐标与朝向</label>
+        <p className="text-xs text-white/40">默认仅自己可见；付费解锁也不会自动公开精确机位。GPS/EXIF 信息需由你确认。</p>
       </Section>
 
       {/* Shooting Time & Weather */}
@@ -149,7 +154,12 @@ export function ShootingParamsForm({ params, onChange }: Props) {
               placeholder="如 35"
               className={inputClass}
             />
-            <p className="text-[10px] text-white/30 mt-1">8-1200mm，全画幅等效</p>
+            <p className="text-[10px] text-white/30 mt-1">实际焦距；请同时确认传感器尺寸</p>
+          </Field>
+          <Field label="传感器尺寸">
+            <select value={params.sensorFormat} onChange={(event) => update('sensorFormat', event.target.value)} className={inputClass}>
+              <option value="unknown">未知</option><option value="fullFrame">全画幅</option><option value="apsc">APS-C</option><option value="m43">M4/3</option>
+            </select>
           </Field>
         </div>
       </Section>

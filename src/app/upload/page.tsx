@@ -1,31 +1,20 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
 import { Upload, CheckCircle } from 'lucide-react';
-import exifr from 'exifr';
 import { PhotoUploader } from '@/components/upload/PhotoUploader';
 import { ShootingParamsForm } from '@/components/upload/ShootingParamsForm';
+import type { PhotoEvidence } from '@/lib/photo-evidence';
 
-function formatShutter(sec: number | undefined): string | undefined {
-  if (!sec) return undefined;
-  if (sec >= 1) return `${sec}s`;
-  return `1/${Math.round(1 / sec)}s`;
-}
-
-interface ExifMetadata {
-  Make?: string;
-  Model?: string;
-  LensModel?: string;
-  FNumber?: number;
-  ExposureTime?: number;
-  ISO?: number;
-  FocalLength?: number;
-  longitude?: number;
-  latitude?: number;
-  DateTimeOriginal?: string | Date;
+interface AnalysisResponse {
+  evidence: PhotoEvidence;
+  width: number;
+  height: number;
+  guidance: string[];
+  analysisType: 'exif_only';
+  visualGeolocation: 'not_run';
 }
 
 export default function UploadPage() {
@@ -36,6 +25,9 @@ export default function UploadPage() {
   const [uploading, setUploading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
+  const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const requestId = useRef(0);
   const [params, setParams] = useState({
     title: '',
     description: '',
@@ -51,8 +43,10 @@ export default function UploadPage() {
     shutterSpeed: '',
     iso: '',
     focalLength: '',
+    sensorFormat: 'unknown' as 'unknown' | 'fullFrame' | 'apsc' | 'm43',
     azimuth: '',
     elevation: '',
+    shareCoordinates: false,
     priceType: 'free' as 'free' | 'paid',
     price: '',
   });
@@ -63,42 +57,58 @@ export default function UploadPage() {
     }
   }, [status, router]);
 
-  const handleFileSelect = useCallback((selectedFile: File) => {
+  const handleFileSelect = useCallback(async (selectedFile: File) => {
+    const currentRequest = ++requestId.current;
     setFile(selectedFile);
-    setError('');
+    setError(''); setAnalysis(null); setAnalyzing(true);
+    // Evidence and consent belong to one photo. Replacing it must not carry
+    // coordinates or a prior sharing choice into the next submission.
+    setParams((current) => ({ ...current, locationId: '', coordinatesLng: '', coordinatesLat: '',
+      shotAt: '', weather: '', cameraMake: '', cameraModel: '', lens: '', aperture: '',
+      shutterSpeed: '', iso: '', focalLength: '', sensorFormat: 'unknown',
+      azimuth: '', elevation: '', shareCoordinates: false }));
     const reader = new FileReader();
-    reader.onload = (e) => setPreview(e.target?.result as string);
+    reader.onload = (e) => { if (currentRequest === requestId.current) setPreview(e.target?.result as string); };
     reader.readAsDataURL(selectedFile);
-
-    // Auto-parse EXIF/GPS from the file. Best-effort: failures are silent.
-    exifr.parse(selectedFile, {
-      tiff: true,
-      exif: true,
-      gps: true,
-    }).then((raw: unknown) => {
-      if (!raw || typeof raw !== 'object') return;
-      const exif = raw as ExifMetadata;
-      setParams((prev) => ({
-        ...prev,
-        cameraMake: exif.Make ?? prev.cameraMake,
-        cameraModel: exif.Model ?? prev.cameraModel,
-        lens: exif.LensModel ?? prev.lens,
-        aperture: exif.FNumber ? `f/${exif.FNumber}` : prev.aperture,
-        shutterSpeed: formatShutter(exif.ExposureTime) ?? prev.shutterSpeed,
-        iso: exif.ISO ? String(exif.ISO) : prev.iso,
-        focalLength: exif.FocalLength ? String(Math.round(exif.FocalLength)) : prev.focalLength,
-        coordinatesLng: exif.longitude != null ? exif.longitude.toFixed(6) : prev.coordinatesLng,
-        coordinatesLat: exif.latitude != null ? exif.latitude.toFixed(6) : prev.coordinatesLat,
-        shotAt: exif.DateTimeOriginal
-          ? new Date(exif.DateTimeOriginal).toISOString().slice(0, 16)
-          : prev.shotAt,
-      }));
-    }).catch(() => {});
+    try {
+      const form = new FormData(); form.append('file', selectedFile);
+      const response = await fetch('/api/photos/analyze', { method: 'POST', body: form });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || '照片分析失败');
+      if (currentRequest === requestId.current) setAnalysis(data as AnalysisResponse);
+    } catch (error) { if (currentRequest === requestId.current) setError(error instanceof Error ? error.message : '照片分析失败'); }
+    finally { if (currentRequest === requestId.current) setAnalyzing(false); }
   }, []);
 
+  function applyEvidence() {
+    if (!analysis) return;
+    const e = analysis.evidence;
+    setParams((current) => ({ ...current,
+      coordinatesLng: current.coordinatesLng || (e.coordinates ? e.coordinates[0].toFixed(6) : ''),
+      coordinatesLat: current.coordinatesLat || (e.coordinates ? e.coordinates[1].toFixed(6) : ''),
+      shotAt: current.shotAt || e.shotAtLocal || '',
+      cameraMake: current.cameraMake || e.cameraMake || '',
+      cameraModel: current.cameraModel || e.cameraModel || '',
+      lens: current.lens || e.lens || '',
+      aperture: current.aperture || e.aperture || '',
+      shutterSpeed: current.shutterSpeed || e.shutterSpeed || '',
+      iso: current.iso || (e.iso === null ? '' : String(e.iso)),
+      focalLength: current.focalLength || (e.focalLengthMm === null ? '' : String(Math.round(e.focalLengthMm))),
+      sensorFormat: current.sensorFormat === 'unknown' ? e.sensorSuggestion || 'unknown' : current.sensorFormat,
+      azimuth: current.azimuth || (e.azimuthDeg === null ? '' : String(e.azimuthDeg)),
+    }));
+  }
+
   const handleClear = () => {
+    requestId.current++;
     setFile(null);
     setPreview(null);
+    setAnalysis(null);
+    setAnalyzing(false);
+    setParams((current) => ({ ...current, locationId: '', coordinatesLng: '', coordinatesLat: '',
+      shotAt: '', weather: '', cameraMake: '', cameraModel: '', lens: '', aperture: '',
+      shutterSpeed: '', iso: '', focalLength: '', sensorFormat: 'unknown',
+      azimuth: '', elevation: '', shareCoordinates: false }));
   };
 
   async function handleSubmit() {
@@ -134,8 +144,10 @@ export default function UploadPage() {
           shutterSpeed: params.shutterSpeed || undefined,
           iso: params.iso ? parseInt(params.iso) : undefined,
           focalLength: params.focalLength ? parseInt(params.focalLength) : undefined,
+          sensorFormat: params.sensorFormat,
           azimuth: params.azimuth ? parseFloat(params.azimuth) : undefined,
           elevation: params.elevation ? parseFloat(params.elevation) : undefined,
+          shareCoordinates: params.shareCoordinates,
           priceType: params.priceType,
           price: params.price ? parseFloat(params.price) : 0,
         })
@@ -200,6 +212,15 @@ export default function UploadPage() {
             preview={preview}
             onClear={handleClear}
           />
+          {analyzing && <p className="text-sm text-white/50">正在读取照片元数据…</p>}
+          {analysis && <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-2 text-sm">
+            <h2 className="font-medium">照片证据与拍摄建议</h2>
+            <p className="text-white/60">已读取 EXIF，尚未运行画面视觉定位。{analysis.width} × {analysis.height} 像素；解析结果仅作为待确认建议。</p>
+            <p>GPS：{analysis.evidence.coordinates ? analysis.evidence.coordinates.join(', ') : '无'}；朝向：{analysis.evidence.azimuthDeg === null ? '未知' : `${analysis.evidence.azimuthDeg}°`}；焦距：{analysis.evidence.focalLengthMm === null ? '未知' : `${analysis.evidence.focalLengthMm}mm`}。</p>
+            {analysis.evidence.warnings.map((item, index) => <p className="text-amber-300" key={index}>{item}</p>)}
+            {analysis.guidance.map((item, index) => <p className="text-white/70" key={index}>{item}</p>)}
+            <button className="text-glow underline" onClick={applyEvidence}>将建议填入空白表单项</button>
+          </div>}
         </div>
 
         {/* Right: Parameters */}

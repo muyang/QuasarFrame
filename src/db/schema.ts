@@ -118,10 +118,13 @@ export const photos = sqliteTable('photos', {
   shutterSpeed: text('shutter_speed'),
   iso: integer('iso'),
   focalLength: integer('focal_length'),
+  sensorFormat: text('sensor_format', { enum: ['unknown', 'fullFrame', 'apsc', 'm43'] }).notNull().default('unknown'),
   // Shooting position
   azimuth: real('azimuth'),
   elevation: real('elevation_deg'),
   gpsAccuracy: real('gps_accuracy'),
+  metadataProvenance: text('metadata_provenance').notNull().default('{}'),
+  shareCoordinates: integer('share_coordinates', { mode: 'boolean' }).notNull().default(false),
   // Pricing
   priceType: text('price_type', { enum: ['free', 'paid'] }).notNull().default('free'),
   price: real('price').notNull().default(0),

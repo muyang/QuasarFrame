@@ -37,13 +37,3 @@ export async function processAndSaveImage(
     thumbnailUrl: `/uploads/${thumbFileName}`,
   };
 }
-
-/** Try to extract EXIF GPS coordinates from image buffer */
-export async function extractExifGps(
-  _fileBuffer: Buffer
-): Promise<{ lng?: number; lat?: number } | null> {
-  // For production, use exifr or exif-parser for proper EXIF parsing.
-  // Sharp's metadata() returns raw EXIF buffer — requires a dedicated parser.
-  // Users can enter coordinates manually for now.
-  return null;
-}

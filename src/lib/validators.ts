@@ -30,9 +30,11 @@ export const photoUploadSchema = z.object({
   shutterSpeed: z.string().max(20).optional(),
   iso: z.number().int().min(0).max(1000000).optional(),
   focalLength: z.number().int().min(1).max(2000).optional(),
+  sensorFormat: z.enum(['unknown', 'fullFrame', 'apsc', 'm43']).default('unknown'),
   azimuth: z.number().min(0).max(360).optional(),
   elevation: z.number().min(-90).max(90).optional(),
   gpsAccuracy: z.number().min(0).optional(),
+  shareCoordinates: z.boolean().default(false),
   priceType: z.enum(['free', 'paid']).default('free'),
   price: z.number().min(0).max(10000).default(0),
 });

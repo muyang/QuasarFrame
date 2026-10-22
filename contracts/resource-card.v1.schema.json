@@ -1,0 +1,301 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "type": "number",
+      "const": 1
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*$"
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "data",
+        "capability"
+      ]
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "status": {
+      "type": "string",
+      "const": "ready"
+    },
+    "provider": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https:\\/\\/.*"
+        }
+      },
+      "required": [
+        "name",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "coverage": {
+      "type": "object",
+      "properties": {
+        "bbox": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "number",
+              "minimum": -180,
+              "maximum": 180
+            },
+            {
+              "type": "number",
+              "minimum": -90,
+              "maximum": 90
+            },
+            {
+              "type": "number",
+              "minimum": -180,
+              "maximum": 180
+            },
+            {
+              "type": "number",
+              "minimum": -90,
+              "maximum": 90
+            }
+          ],
+          "minItems": 4,
+          "maxItems": 4
+        },
+        "horizontalCrs": {
+          "type": "string",
+          "const": "EPSG:4326"
+        },
+        "verticalDatum": {
+          "type": "string",
+          "enum": [
+            "EGM2008",
+            "not_applicable"
+          ]
+        },
+        "temporal": {
+          "type": "object",
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "static",
+                "computed"
+              ]
+            },
+            "validFrom": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "validUntil": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "mode",
+            "validFrom",
+            "validUntil"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "bbox",
+        "horizontalCrs",
+        "verticalDatum",
+        "temporal"
+      ],
+      "additionalProperties": false
+    },
+    "contract": {
+      "type": "object",
+      "properties": {
+        "operations": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "inputSchema": {
+          "type": "string",
+          "minLength": 1
+        },
+        "outputSchema": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "operations",
+        "inputSchema",
+        "outputSchema"
+      ],
+      "additionalProperties": false
+    },
+    "provenance": {
+      "type": "object",
+      "properties": {
+        "sourceUrl": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https:\\/\\/.*"
+        },
+        "attribution": {
+          "type": "string",
+          "minLength": 1
+        },
+        "contentSha256": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "retrievedAt": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "sourceUrl",
+        "attribution",
+        "contentSha256",
+        "retrievedAt"
+      ],
+      "additionalProperties": false
+    },
+    "rights": {
+      "type": "object",
+      "properties": {
+        "access": {
+          "type": "string",
+          "enum": [
+            "public_derived",
+            "internal_only"
+          ]
+        },
+        "rawRedistribution": {
+          "type": "string",
+          "enum": [
+            "not_evaluated",
+            "permitted",
+            "prohibited"
+          ]
+        },
+        "termsUrl": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https:\\/\\/.*"
+        }
+      },
+      "required": [
+        "access",
+        "rawRedistribution",
+        "termsUrl"
+      ],
+      "additionalProperties": false
+    },
+    "quality": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "theoretical",
+            "unverified_accuracy"
+          ]
+        },
+        "resolutionArcsec": {
+          "anyOf": [
+            {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "limitations": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "required": [
+        "status",
+        "resolutionArcsec",
+        "limitations"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "id",
+    "kind",
+    "version",
+    "title",
+    "status",
+    "provider",
+    "coverage",
+    "contract",
+    "provenance",
+    "rights",
+    "quality"
+  ],
+  "additionalProperties": false,
+  "$id": "https://raw.githubusercontent.com/muyang/QuasarFrame/main/contracts/resource-card.v1.schema.json"
+}

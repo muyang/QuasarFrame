@@ -322,6 +322,7 @@ export function ShootingPlanner({ location, onVantageChange }: { location: Locat
       {terrainResult && <div className="text-xs space-y-2 border border-border rounded-lg p-3">
         <p>{terrainResult.plan.name} · {terrainResult.plan.dateKey} · {terrainResult.plan.coordinates.join(', ')} · 方向 {terrainResult.plan.azimuth}°</p>
         <p>{terrainResult.analysis.dataset} · 高程基准 {terrainResult.analysis.verticalDatum} · 版本 {terrainResult.analysis.dataVersion}</p>
+        {terrainResult.analysis.resource && <p>资源卡 {terrainResult.analysis.resource.cardId} · <a className="underline" href={terrainResult.analysis.resource.sourceUrl} target="_blank" rel="noopener noreferrer">数据来源</a> · 精度尚未现场核验。{terrainResult.analysis.resource.attribution}</p>}
         {terrainResult.analysis.sampledElevationM !== undefined && <p>机位坐标处地表高程约 {terrainResult.analysis.sampledElevationM.toFixed(0)} 米{terrainResult.analysis.catalogueDifferenceM !== null && terrainResult.analysis.catalogueDifferenceM !== undefined
           ? `；与目录标注相差约 ${Math.abs(terrainResult.analysis.catalogueDifferenceM)} 米` : ''}。</p>}
         {terrainResult.analysis.status === 'datum_mismatch' ? <p className="text-amber-600">输入海拔的高程基准与地形 EGM2008 不一致。请换算后再分析，或留空以使用地形采样高程。</p>

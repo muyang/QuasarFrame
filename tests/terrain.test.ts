@@ -67,7 +67,7 @@ test('固定小 DEM 的双线性采样、缺失掩膜和校验和失败', () => 
     writeFileSync(path.join(directory, 'elevation.f32'), elevation);
     writeFileSync(path.join(directory, 'valid.u8'), valid);
     const metadata = { schemaVersion: 1, locationId: 'niubei', dataVersion: 'test-fixture-v1',
-      dataset: 'synthetic fixture', datasetUrl: '', attribution: '', rasterType: 'DSM',
+      dataset: 'synthetic fixture', datasetUrl: 'https://example.com/dem', attribution: 'Synthetic test fixture', rasterType: 'DSM',
       horizontalDatum: 'EPSG:4326', verticalDatum: 'EGM2008',
       bounds: [origin[0] - 1 / 7200, origin[1] - 2.5 / 3600,
         origin[0] + 2.5 / 3600, origin[1] + 1 / 7200],
@@ -93,12 +93,19 @@ test('固定小 DEM 的双线性采样、缺失掩膜和校验和失败', () => 
     });
     const illustrative = analyzeTerrain('niubei', request)!;
     assert.equal(illustrative.status, 'illustrative_coordinate_mismatch');
+    assert.equal(illustrative.resource.cardId, 'terrain.dem.niubei');
+    assert.equal(illustrative.resource.cardVersion, 'test-fixture-v1');
+    assert.equal(illustrative.resource.sourceUrl, 'https://example.com/dem');
     assert.equal('sun' in illustrative, false);
     const wrongDatum = analyzeTerrain('niubei', {
       ...request, vantage: { ...request.vantage, coordinateSource: 'user',
         elevationM: 100, verticalDatum: 'EGM96' },
     })!;
     assert.equal(wrongDatum.status, 'datum_mismatch');
+    const outside = analyzeTerrain('niubei', {
+      ...request, vantage: { ...request.vantage, coordinates: [103, 30], coordinateSource: 'user' },
+    })!;
+    assert.equal(outside.status, 'outside_coverage');
   } finally {
     if (previous === undefined) delete process.env.TERRAIN_DATA_DIR;
     else process.env.TERRAIN_DATA_DIR = previous;

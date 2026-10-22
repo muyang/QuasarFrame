@@ -43,3 +43,7 @@ The seed creates demo accounts with known passwords and demonstration camera fee
 ## Niubei terrain pilot
 
 Install Python 3 with NumPy and Rasterio, then run `python3 scripts/terrain/build_niubei.py --download`. The four pinned public COGs and generated grid stay in ignored `terrain-data/`; the app loads them at startup. The process and field validation format are in [docs/p2-terrain-pilot.md](docs/p2-terrain-pilot.md). Without this local grid, the page labels its procedural 3D view as illustrative.
+
+## Resource card pilot
+
+`GET /api/resources` lists public resource cards for the SunCalc-based astronomy capability and any installed, validated Niubei DEM. `GET /api/resources/{id}` returns one card. The terrain analysis response includes its card ID, data version, source URL, attribution, checksum, and unverified-accuracy status. Missing or invalid local DEM data is not advertised as ready. The versioned JSON Schema is in `contracts/resource-card.v1.schema.json`; regenerate it after editing the Zod contract with `npm run resource-card:schema` under Node 22.

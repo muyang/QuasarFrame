@@ -14,6 +14,7 @@ interface Photo {
   price: number;
   downloadCount: number;
   viewCount: number;
+  status: string;
   createdAt: string;
 }
 
@@ -62,7 +63,7 @@ export default function MyWorksPage() {
           <p className="text-xs uppercase tracking-widest text-glow/70 mb-2 font-mono">MY WORKS</p>
           <h1 className="text-3xl font-bold font-heading">我的作品</h1>
           <p className="text-muted-foreground mt-2 text-sm">
-            {photos.length > 0 ? `共 ${photos.length} 张已审通过的照片` : '还没有上传过照片'}
+            {photos.length > 0 ? `共 ${photos.length} 张作品；未获分发授权的作品仅自己可见` : '还没有上传过照片'}
           </p>
         </div>
         <Link
@@ -108,7 +109,7 @@ export default function MyWorksPage() {
                   {p.title}
                 </h3>
                 <div className="flex items-center justify-between mt-1 text-[10px] text-muted-foreground font-mono">
-                  <span>{p.priceType === 'free' ? '免费' : `¥${p.price}`}</span>
+                  <span>{p.status === 'approved' ? (p.priceType === 'free' ? '免费' : `¥${p.price}`) : p.status}</span>
                   <span>▼ {p.viewCount} · ⬇ {p.downloadCount}</span>
                 </div>
               </div>

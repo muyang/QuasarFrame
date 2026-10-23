@@ -1,0 +1,213 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "type": "number",
+      "const": 1
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^media\\.photo\\..*"
+    },
+    "kind": {
+      "type": "string",
+      "const": "media"
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "private",
+        "published",
+        "withdrawn"
+      ]
+    },
+    "ownerId": {
+      "type": "string"
+    },
+    "capture": {
+      "type": "object",
+      "properties": {
+        "localTime": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "timeZoneStatus": {
+          "type": "string",
+          "const": "unknown"
+        },
+        "coordinates": {
+          "anyOf": [
+            {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "minItems": 2,
+              "maxItems": 2
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "coordinateSource": {
+          "type": "string",
+          "enum": [
+            "exif",
+            "manual",
+            "unknown"
+          ]
+        },
+        "precisionStatus": {
+          "type": "string",
+          "const": "unverified"
+        }
+      },
+      "required": [
+        "localTime",
+        "timeZoneStatus",
+        "coordinates",
+        "coordinateSource",
+        "precisionStatus"
+      ],
+      "additionalProperties": false
+    },
+    "provenance": {
+      "type": "object",
+      "properties": {
+        "source": {
+          "type": "string",
+          "const": "user_submission"
+        },
+        "createdAt": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "source",
+        "createdAt"
+      ],
+      "additionalProperties": false
+    },
+    "rights": {
+      "type": "object",
+      "properties": {
+        "licenseStatus": {
+          "type": "string",
+          "enum": [
+            "missing",
+            "pending",
+            "approved",
+            "rejected",
+            "revoked"
+          ]
+        },
+        "licenseVersion": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "scope": {
+          "type": "object",
+          "properties": {
+            "web": {
+              "type": "boolean"
+            },
+            "mobile": {
+              "type": "boolean"
+            },
+            "tv": {
+              "type": "boolean"
+            },
+            "frame": {
+              "type": "boolean"
+            },
+            "paid": {
+              "type": "boolean"
+            },
+            "derivative": {
+              "type": "boolean"
+            },
+            "download": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "web",
+            "mobile",
+            "tv",
+            "frame",
+            "paid",
+            "derivative",
+            "download"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "licenseStatus",
+        "licenseVersion",
+        "scope"
+      ],
+      "additionalProperties": false
+    },
+    "contract": {
+      "type": "object",
+      "properties": {
+        "imageEndpoint": {
+          "type": "string"
+        },
+        "evidenceEndpoint": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "imageEndpoint",
+        "evidenceEndpoint"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "id",
+    "kind",
+    "version",
+    "title",
+    "status",
+    "ownerId",
+    "capture",
+    "provenance",
+    "rights",
+    "contract"
+  ],
+  "additionalProperties": false,
+  "$id": "https://raw.githubusercontent.com/muyang/QuasarFrame/main/contracts/media-card.v1.schema.json"
+}

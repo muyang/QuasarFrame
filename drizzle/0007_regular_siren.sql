@@ -1,0 +1,1 @@
+ALTER TABLE `entitlement_grants` ADD `channels_json` text NOT NULL;

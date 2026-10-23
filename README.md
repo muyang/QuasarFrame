@@ -47,3 +47,7 @@ Install Python 3 with NumPy and Rasterio, then run `python3 scripts/terrain/buil
 ## Resource card pilot
 
 `GET /api/resources` lists public resource cards for the SunCalc-based astronomy capability and any installed, validated Niubei DEM. `GET /api/resources/{id}` returns one card. The terrain analysis response includes its card ID, data version, source URL, attribution, checksum, and unverified-accuracy status. Missing or invalid local DEM data is not advertised as ready. The versioned JSON Schema is in `contracts/resource-card.v1.schema.json`; regenerate it after editing the Zod contract with `npm run resource-card:schema` under Node 22.
+
+## Photo evidence, knowledge and rights pilot
+
+The photo MediaCard, private evidence/candidate records, sourced editorial knowledge graph, versioned distribution licenses, and cross-screen entitlement checks are documented in [docs/platform-evidence-knowledge-entitlements.md](docs/platform-evidence-knowledge-entitlements.md). For an existing local database, back up before migrating: `npm run db:backup`, `npm run db:migrate`, `npm run images:privatize-thumbnails`, then `npm run kg:seed`. Existing works do not receive distribution rights automatically; their owners must submit a scope for separate administrator review.

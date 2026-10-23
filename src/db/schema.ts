@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, real, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, real, uniqueIndex, index } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
 
 // ─── Users ───
@@ -136,6 +136,93 @@ export const photos = sqliteTable('photos', {
   rejectReason: text('reject_reason'),
   createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
 });
+
+// Private by default. Evidence and candidates retain their source instead of
+// replacing a photo's author-entered coordinates with an automated guess.
+export const photoEvidenceItems = sqliteTable('photo_evidence_items', {
+  id: text('id').primaryKey(),
+  photoId: text('photo_id').notNull().references(() => photos.id),
+  ownerId: text('owner_id').notNull().references(() => users.id),
+  field: text('field').notNull(),
+  source: text('source', { enum: ['exif', 'manual', 'visual', 'terrain'] }).notNull(),
+  valueJson: text('value_json').notNull(),
+  confidence: text('confidence', { enum: ['reported', 'candidate', 'verified'] }).notNull(),
+  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+}, (table) => [index('photo_evidence_photo_idx').on(table.photoId)]);
+
+export const photoLocationCandidates = sqliteTable('photo_location_candidates', {
+  id: text('id').primaryKey(),
+  photoId: text('photo_id').notNull().references(() => photos.id),
+  ownerId: text('owner_id').notNull().references(() => users.id),
+  longitude: real('longitude').notNull(),
+  latitude: real('latitude').notNull(),
+  radiusM: real('radius_m'),
+  azimuthDeg: real('azimuth_deg'),
+  method: text('method', { enum: ['exif', 'manual', 'skyline'] }).notNull(),
+  score: real('score'),
+  status: text('status', { enum: ['proposed', 'user_confirmed', 'rejected'] }).notNull().default('proposed'),
+  evidenceJson: text('evidence_json').notNull(),
+  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+}, (table) => [index('photo_candidate_photo_idx').on(table.photoId)]);
+
+// Curated graph facts require a source; user photos and precise positions are
+// never inserted into the public graph by upload or candidate generation.
+export const knowledgeNodes = sqliteTable('knowledge_nodes', {
+  id: text('id').primaryKey(),
+  kind: text('kind').notNull(),
+  label: text('label').notNull(),
+  description: text('description').notNull(),
+  claimType: text('claim_type', { enum: ['fact', 'observation', 'inference', 'recommendation'] }).notNull(),
+  sourceUrl: text('source_url').notNull(),
+  sourceLicense: text('source_license').notNull(),
+  version: integer('version').notNull().default(1),
+  status: text('status', { enum: ['draft', 'published', 'withdrawn'] }).notNull().default('draft'),
+  updatedAt: text('updated_at').notNull().default(sql`(datetime('now'))`),
+});
+
+export const knowledgeEdges = sqliteTable('knowledge_edges', {
+  id: text('id').primaryKey(),
+  fromId: text('from_id').notNull().references(() => knowledgeNodes.id),
+  toId: text('to_id').notNull().references(() => knowledgeNodes.id),
+  relation: text('relation').notNull(),
+  claimType: text('claim_type', { enum: ['fact', 'observation', 'inference', 'recommendation'] }).notNull(),
+  sourceUrl: text('source_url').notNull(),
+  version: integer('version').notNull().default(1),
+  status: text('status', { enum: ['draft', 'published', 'withdrawn'] }).notNull().default('draft'),
+  updatedAt: text('updated_at').notNull().default(sql`(datetime('now'))`),
+}, (table) => [index('knowledge_edge_from_idx').on(table.fromId), index('knowledge_edge_to_idx').on(table.toId)]);
+
+// A purchase or an approved photo alone does not imply redistribution rights.
+// The latest license version must explicitly permit the intended use/screen.
+export const sourceLicenses = sqliteTable('source_licenses', {
+  id: text('id').primaryKey(),
+  resourceType: text('resource_type', { enum: ['photo', 'feed', 'bundle'] }).notNull(),
+  resourceId: text('resource_id').notNull(),
+  ownerId: text('owner_id').references(() => users.id),
+  version: integer('version').notNull(),
+  status: text('status', { enum: ['pending', 'approved', 'rejected', 'revoked'] }).notNull().default('pending'),
+  scopeJson: text('scope_json').notNull(),
+  evidenceUrl: text('evidence_url'),
+  reviewedBy: text('reviewed_by').references(() => users.id),
+  reviewedAt: text('reviewed_at'),
+  revokedAt: text('revoked_at'),
+  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+}, (table) => [
+  uniqueIndex('source_license_version_unique').on(table.resourceType, table.resourceId, table.version),
+  index('source_license_resource_idx').on(table.resourceType, table.resourceId),
+]);
+
+export const entitlementGrants = sqliteTable('entitlement_grants', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id),
+  resourceType: text('resource_type', { enum: ['photo', 'feed', 'bundle'] }).notNull(),
+  resourceId: text('resource_id').notNull(),
+  purchaseId: text('purchase_id').references(() => purchases.id),
+  licenseId: text('license_id').notNull().references(() => sourceLicenses.id),
+  channelsJson: text('channels_json').notNull(),
+  grantedAt: text('granted_at').notNull().default(sql`(datetime('now'))`),
+  revokedAt: text('revoked_at'),
+}, (table) => [index('entitlement_user_resource_idx').on(table.userId, table.resourceType, table.resourceId)]);
 
 // ─── Camera Feeds ───
 export const cameraFeeds = sqliteTable('camera_feeds', {

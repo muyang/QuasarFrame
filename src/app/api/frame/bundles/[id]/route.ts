@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { eq, and } from 'drizzle-orm';
 import { db } from '@/db';
 import { frameContentBundles } from '@/db/schema';
+import { bundleDeliverable, parseBundlePhotoIds } from '@/lib/frame-royalty';
 
 // GET — public bundle detail (active only)
 export async function GET(
@@ -21,14 +22,14 @@ export async function GET(
     )
     .limit(1);
 
-  if (!bundle) {
+  if (!bundle || !bundleDeliverable(bundle.photoIds)) {
     return NextResponse.json({ error: '内容包不存在或已下架' }, { status: 404 });
   }
 
   return NextResponse.json({
     bundle: {
       ...bundle,
-      photoIds: bundle.photoIds ? JSON.parse(bundle.photoIds) : [],
+      photoIds: parseBundlePhotoIds(bundle.photoIds),
       royaltyRule: bundle.royaltyRule ? JSON.parse(bundle.royaltyRule) : { type: 'percent', value: 0.5 },
     },
   });

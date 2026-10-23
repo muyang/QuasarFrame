@@ -4,6 +4,7 @@ import { requireRole } from '@/auth/middleware';
 import { db } from '@/db';
 import { photos, users } from '@/db/schema';
 import { reviewSchema } from '@/lib/validators';
+import { latestSourceLicense } from '@/server/licenses';
 
 // GET — List all photos for admin review
 export async function GET(req: Request) {
@@ -50,7 +51,9 @@ export async function GET(req: Request) {
         .from(users)
         .where(eq(users.id, photo.userId))
         .limit(1);
-      return { ...photo, imageUrl: `/api/photos/${photo.id}/image`, author };
+      return { ...photo, thumbnailUrl: `/api/photos/${photo.id}/thumbnail`,
+        imageUrl: `/api/photos/${photo.id}/image`, author,
+        licenseStatus: latestSourceLicense('photo', photo.id)?.status ?? 'missing' };
     })
   );
 

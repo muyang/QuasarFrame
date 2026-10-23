@@ -16,9 +16,12 @@
     "resource-card:schema": "node --import tsx scripts/generate-resource-card-schema.ts",
     "db:generate": "node --env-file-if-exists=.env.local node_modules/drizzle-kit/bin.cjs generate",
     "db:migrate": "node --env-file-if-exists=.env.local node_modules/drizzle-kit/bin.cjs migrate",
+    "db:backup": "node --env-file-if-exists=.env.local --import tsx scripts/backup-db.ts",
     "db:seed": "node --env-file-if-exists=.env.local --import tsx src/db/seed.ts",
+    "kg:seed": "node --env-file-if-exists=.env.local --import tsx scripts/seed-knowledge.ts",
     "db:baseline": "node --env-file-if-exists=.env.local --import tsx scripts/baseline-existing-db.ts",
     "images:privatize": "node --import tsx scripts/private-images.ts",
+    "images:privatize-thumbnails": "node --import tsx scripts/private-thumbnails.ts",
     "db:studio": "drizzle-kit studio",
     "postinstall": "mkdir -p public/cesium && cp -r node_modules/cesium/Build/Cesium/Workers public/cesium/ 2>/dev/null; cp -r node_modules/cesium/Build/Cesium/Assets public/cesium/ 2>/dev/null; cp -r node_modules/cesium/Build/Cesium/Widgets public/cesium/ 2>/dev/null; cp -r node_modules/cesium/Build/Cesium/ThirdParty public/cesium/ 2>/dev/null; true"
   },

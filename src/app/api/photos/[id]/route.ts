@@ -1,11 +1,14 @@
 import { NextResponse } from 'next/server';
-import { eq, and } from 'drizzle-orm';
+import { v4 as uuid } from 'uuid';
+import { eq } from 'drizzle-orm';
 import { db } from '@/db';
-import { photos, users, unlocks } from '@/db/schema';
+import { photos, users, photoEvidenceItems, photoLocationCandidates, sourceLicenses } from '@/db/schema';
 import { requireAuth, getUserId } from '@/auth/middleware';
 import { photoUpdateSchema } from '@/lib/validators';
 import { photoProvenanceSchema } from '@/lib/photo-evidence';
 import { redactPhotoPosition } from '@/lib/photo-privacy';
+import { licensedFor, latestSourceLicense } from '@/server/licenses';
+import { hasEntitlement } from '@/server/entitlements';
 
 // GET photo detail
 export async function GET(
@@ -59,7 +62,8 @@ export async function GET(
   }
   const isOwner = currentUserId === photo.userId;
   const isAdmin = session?.user?.role === 'admin';
-  if (photo.status !== 'approved' && !isOwner && !isAdmin) {
+  if (!isOwner && !isAdmin && (photo.status !== 'approved' || !licensedFor('photo', id, 'web',
+    photo.priceType === 'paid' ? 'paid' : 'view'))) {
     return NextResponse.json({ error: '作品不存在' }, { status: 404 });
   }
 
@@ -79,16 +83,7 @@ export async function GET(
   // Check if current user has unlocked this photo
   let isUnlocked = photo.priceType === 'free' || isOwner || isAdmin;
 
-  if (currentUserId) {
-    if (!isUnlocked) {
-      const [unlock] = await db
-        .select()
-        .from(unlocks)
-        .where(and(eq(unlocks.userId, currentUserId), eq(unlocks.resourceId, id)))
-        .limit(1);
-      if (unlock) isUnlocked = true;
-    }
-  }
+  if (currentUserId && !isUnlocked) isUnlocked = hasEntitlement(currentUserId, 'photo', id, 'web');
 
   // Increment view count
   await db
@@ -98,11 +93,12 @@ export async function GET(
 
   // For paid content, hide full-res URL and shooting params unless unlocked
   const responsePhoto = { ...photo };
+  responsePhoto.thumbnailUrl = `/api/photos/${id}/thumbnail`;
   let provenance = photoProvenanceSchema.parse({});
   try { provenance = photoProvenanceSchema.parse(JSON.parse(photo.metadataProvenance)); }
   catch { /* Pre-migration records have no source evidence. */ }
   if (!isUnlocked) {
-    responsePhoto.imageUrl = photo.thumbnailUrl; // show thumbnail only
+    responsePhoto.imageUrl = responsePhoto.thumbnailUrl; // show thumbnail only
     responsePhoto.aperture = null;
     responsePhoto.shutterSpeed = null;
     responsePhoto.iso = null;
@@ -171,9 +167,26 @@ export async function PATCH(
       .some((field) => field in parsed.data)) provenance.settings = 'manual';
     updateData.metadataProvenance = JSON.stringify(provenance);
 
-    if (Object.keys(updateData).length > 0) {
-      await db.update(photos).set(updateData).where(eq(photos.id, id));
-    }
+    db.transaction((tx) => {
+      if (Object.keys(updateData).length > 0) tx.update(photos).set(updateData).where(eq(photos.id, id)).run();
+      const changed: Array<{ field: string; value: unknown }> = [];
+      if (changedPosition) {
+        const coordinates = [parsed.data.coordinatesLng!, parsed.data.coordinatesLat!];
+        changed.push({ field: 'coordinates', value: coordinates });
+        tx.insert(photoLocationCandidates).values({
+          id: uuid(), photoId: id, ownerId: userId!, longitude: coordinates[0], latitude: coordinates[1],
+          radiusM: null, azimuthDeg: parsed.data.azimuth ?? null, method: 'manual', status: 'proposed',
+          evidenceJson: JSON.stringify({ coordinateSource: 'manual_edit', accuracySource: 'unknown' }),
+        }).run();
+      }
+      if (parsed.data.azimuth !== undefined) changed.push({ field: 'azimuthDeg', value: parsed.data.azimuth });
+      if (parsed.data.shotAt !== undefined) changed.push({ field: 'shotAtLocal', value: parsed.data.shotAt });
+      if (parsed.data.focalLength !== undefined) changed.push({ field: 'focalLengthMm', value: parsed.data.focalLength });
+      for (const item of changed) tx.insert(photoEvidenceItems).values({
+        id: uuid(), photoId: id, ownerId: userId!, field: item.field,
+        source: 'manual', valueJson: JSON.stringify(item.value), confidence: 'reported',
+      }).run();
+    });
 
     return NextResponse.json({ message: '更新成功' });
   } catch {
@@ -201,6 +214,14 @@ export async function DELETE(
     return NextResponse.json({ error: '无权删除' }, { status: 403 });
   }
 
-  await db.delete(photos).where(eq(photos.id, id));
+  db.transaction((tx) => {
+    const license = latestSourceLicense('photo', id);
+    if (license && license.status !== 'revoked') tx.update(sourceLicenses)
+      .set({ status: 'revoked', revokedAt: new Date().toISOString() })
+      .where(eq(sourceLicenses.id, license.id)).run();
+    tx.delete(photoEvidenceItems).where(eq(photoEvidenceItems.photoId, id)).run();
+    tx.delete(photoLocationCandidates).where(eq(photoLocationCandidates.photoId, id)).run();
+    tx.delete(photos).where(eq(photos.id, id)).run();
+  });
   return NextResponse.json({ message: '已删除' });
 }

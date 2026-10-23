@@ -1,12 +1,14 @@
 import { NextResponse } from 'next/server';
 import { v4 as uuid } from 'uuid';
-import { eq, desc, and, like } from 'drizzle-orm';
+import { eq, desc, and, like, sql } from 'drizzle-orm';
 import { requireAuth, getUserId } from '@/auth/middleware';
 import { db } from '@/db';
-import { photos } from '@/db/schema';
+import { photos, photoEvidenceItems, photoLocationCandidates, sourceLicenses } from '@/db/schema';
 import { photoUploadSchema } from '@/lib/validators';
+import type { DistributionScope } from '@/lib/license';
 import { processAndSaveImage } from '@/lib/file-upload';
 import { provenanceForSubmission } from '@/lib/photo-evidence';
+import { photoEvidenceRecords, photoLocationRecords } from '@/lib/photo-records';
 import { analyzePhotoBuffer } from '@/server/photo-evidence';
 
 // POST — Upload new photo (multipart/form-data)
@@ -38,6 +40,7 @@ export async function POST(req: Request) {
 
     // Parse metadata
     let metadata: Partial<typeof photos.$inferInsert> = {};
+    let licenseScope: DistributionScope | null = null;
     if (metadataJson) {
       const parsed = photoUploadSchema.safeParse(JSON.parse(metadataJson));
       if (!parsed.success) {
@@ -46,6 +49,10 @@ export async function POST(req: Request) {
           { status: 400 }
         );
       }
+      if (parsed.data.distributionScope && !parsed.data.attestOwnership) {
+        return NextResponse.json({ error: '发布授权前需确认作品权利' }, { status: 400 });
+      }
+      licenseScope = parsed.data.attestOwnership ? parsed.data.distributionScope ?? null : null;
       metadata = parsed.data;
     }
     if ((metadata.coordinatesLng == null) !== (metadata.coordinatesLat == null)) {
@@ -59,8 +66,9 @@ export async function POST(req: Request) {
     const photoId = uuid();
     const { imageUrl, thumbnailUrl } = await processAndSaveImage(fileBuffer, photoId);
 
-    // Create photo record
-    await db.insert(photos).values({
+    // Keep the photo, field-level evidence, and proposed positions atomic.
+    db.transaction((tx) => {
+      tx.insert(photos).values({
       id: photoId,
       userId,
       title: metadata.title || '未命名作品',
@@ -88,6 +96,17 @@ export async function POST(req: Request) {
       priceType: metadata.priceType || 'free',
       price: metadata.price || 0,
       status: 'pending',
+      }).run();
+      for (const item of photoEvidenceRecords(evidence, metadata, provenance)) {
+        tx.insert(photoEvidenceItems).values({ id: uuid(), photoId, ownerId: userId, ...item }).run();
+      }
+      for (const item of photoLocationRecords(evidence, metadata, provenance)) {
+        tx.insert(photoLocationCandidates).values({ id: uuid(), photoId, ownerId: userId, ...item }).run();
+      }
+      if (licenseScope) tx.insert(sourceLicenses).values({
+        id: uuid(), resourceType: 'photo', resourceId: photoId, ownerId: userId,
+        version: 1, status: 'pending', scopeJson: JSON.stringify(licenseScope),
+      }).run();
     });
 
     return NextResponse.json({ id: photoId, imageUrl, thumbnailUrl }, { status: 201 });
@@ -107,8 +126,18 @@ export async function GET(req: Request) {
   const userId = url.searchParams.get('userId');
   const search = url.searchParams.get('q');
   const offset = (page - 1) * limit;
+  const session = userId ? await import('@/auth/config').then((module) => module.auth()) : null;
+  const ownRequest = !!userId && session?.user?.id === userId;
 
-  const conditions = [eq(photos.status, 'approved')];
+  const publicLicense = sql`EXISTS (
+    SELECT 1 FROM source_licenses sl
+    WHERE sl.resource_type = 'photo' AND sl.resource_id = ${photos.id}
+      AND sl.version = (SELECT MAX(version) FROM source_licenses WHERE resource_type = 'photo' AND resource_id = ${photos.id})
+      AND sl.status = 'approved'
+      AND json_extract(sl.scope_json, '$.web') = 1
+      AND (${photos.priceType} = 'free' OR json_extract(sl.scope_json, '$.paid') = 1)
+  )`;
+  const conditions = ownRequest ? [eq(photos.userId, userId!)] : [eq(photos.status, 'approved'), publicLicense];
 
   if (locationId) conditions.push(eq(photos.locationId, locationId));
   if (priceType) conditions.push(eq(photos.priceType, priceType as 'free' | 'paid'));
@@ -139,6 +168,7 @@ export async function GET(req: Request) {
       downloadCount: photos.downloadCount,
       viewCount: photos.viewCount,
       createdAt: photos.createdAt,
+      status: photos.status,
     })
     .from(photos)
     .where(and(...conditions))
@@ -149,9 +179,10 @@ export async function GET(req: Request) {
   return NextResponse.json({
     photos: results.map((photo) => ({
       ...photo,
-      imageUrl: photo.priceType === 'free'
+      thumbnailUrl: `/api/photos/${photo.id}/thumbnail`,
+      imageUrl: ownRequest || photo.priceType === 'free'
         ? `/api/photos/${photo.id}/image`
-        : photo.thumbnailUrl,
+        : `/api/photos/${photo.id}/thumbnail`,
       coordinatesLng: null,
       coordinatesLat: null,
       cameraMake: photo.priceType === 'free' ? photo.cameraMake : null,

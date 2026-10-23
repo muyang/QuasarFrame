@@ -138,7 +138,7 @@ export async function POST(req: Request) {
         paymentMethod: 'balance',
         status: 'completed',
       }).run();
-      settleFrameOrderRoyalties(tx, purchaseId, lineItems);
+      settleFrameOrderRoyalties(tx, purchaseId, userId, lineItems);
       return { id: orderId, purchaseId, totalAmount, status: 'paid', alreadyCreated: false };
     });
     return NextResponse.json(outcome, { status: outcome.alreadyCreated ? 200 : 201 });

@@ -86,8 +86,7 @@ export default function MyRoutesPage() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {routes.map((r) => {
-            const cover = r.coverImage ||
-              'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=800&q=80';
+            const cover = r.coverImage;
             return (
               <Link
                 key={r.id}
@@ -95,12 +94,12 @@ export default function MyRoutesPage() {
                 className="group bg-card border border-border/50 rounded-xl overflow-hidden hover:border-glow/40 transition-all card-lift"
               >
                 <div className="relative aspect-[16/10] overflow-hidden">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={cover}
-                    alt={r.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                  />
+                  {cover ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={cover} alt={r.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                  ) : (
+                    <div className="h-full w-full bg-gradient-to-br from-slate-800 to-slate-950" aria-label="线路尚无封面" />
+                  )}
                   <div className="absolute inset-0 bg-gradient-to-t from-background/80 to-transparent" />
                   <div className="absolute top-3 right-3">
                     <span

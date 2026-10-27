@@ -9,6 +9,7 @@ import { sceneryTypes, sceneryList } from '@/data/scenery-types';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { RouteList } from '@/components/routes/RouteList';
+import { VerifiedPhoto } from '@/components/shared/VerifiedPhoto';
 import type { SceneryType } from '@/types/location';
 
 type Tab = 'photos' | 'routes';
@@ -26,7 +27,7 @@ function DiscoverContent() {
   const router = useRouter();
   const tab: Tab = (searchParams.get('tab') as Tab) === 'routes' ? 'routes' : 'photos';
   const [selectedTags, setSelectedTags] = useState<SceneryType[]>([]);
-  const recommended = locations;
+  const featured = locations;
 
   function switchTab(next: Tab) {
     const sp = new URLSearchParams(searchParams.toString());
@@ -57,7 +58,7 @@ function DiscoverContent() {
           <p className="text-muted-foreground mt-2">按景色类型筛选拍摄地、浏览度假线路、查看实时风景</p>
         </div>
 
-        <p className="text-xs text-muted-foreground mb-4">地点资料与配图待核验；精选按目录展示，不代表当前天气或拍摄成功概率。</p>
+        <p className="text-xs text-muted-foreground mb-4">展示图片已逐张核对地点说明与开放许可；地点坐标、海拔和推荐时段仍属待现场核验的目录资料。</p>
         {/* Tabs */}
         <div className="flex items-center gap-1 mb-8 border-b border-border/50">
           <TabButton
@@ -131,27 +132,23 @@ function DiscoverContent() {
           ))}
         </div>
 
-        {/* Recommended for tonight */}
+        {/* Editorial examples, not a live shooting forecast. */}
         {selectedTags.length === 0 && (
           <div className="mb-12">
             <div className="flex items-center gap-2 mb-4">
               <Sparkles className="w-5 h-5 text-golden" />
-              <h2 className="text-xl font-semibold">地点精选</h2>
+              <h2 className="text-xl font-semibold">风光拍摄样例</h2>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {recommended.slice(0, 3).map((loc, i) => {
+              {featured.slice(0, 3).map((loc, i) => {
                 return (
                   <Link key={loc.id} href={`/location/${loc.id}`}>
                     <Card className="group border-golden/20 hover:border-golden/40 transition-all">
                       <div className="aspect-[16/9] overflow-hidden relative">
-                        <img
-                          src={loc.heroImage}
-                          alt={loc.name}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                        />
+                        <VerifiedPhoto photo={loc.photos[0]} alt={`${loc.name}：${loc.photos[0]?.caption ?? '地点照片待核验'}`} />
                         <div className="absolute top-3 left-3">
                           <Badge className="bg-golden/90 text-golden-foreground text-xs">
-                            #{i + 1} 推荐
+                            样例 #{i + 1}
                           </Badge>
                         </div>
                       </div>
@@ -179,11 +176,7 @@ function DiscoverContent() {
               <Link key={loc.id} href={`/location/${loc.id}`}>
                 <Card className="group overflow-hidden border-border/30 hover:border-primary/30 transition-all hover:shadow-lg hover:shadow-primary/5">
                   <div className="aspect-[3/2] overflow-hidden relative">
-                    <img
-                      src={loc.heroImage}
-                      alt={loc.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    />
+                      <VerifiedPhoto photo={loc.photos[0]} alt={`${loc.name}：${loc.photos[0]?.caption ?? '地点照片待核验'}`} />
 
                   </div>
                   <CardContent className="p-4">

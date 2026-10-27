@@ -73,8 +73,7 @@ export function RouteList() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {routes.map((route) => {
-          const cover = route.coverImage ||
-            'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=800&q=80';
+          const cover = route.coverImage;
           return (
             <Link
               key={route.id}
@@ -82,12 +81,12 @@ export function RouteList() {
               className="group block bg-card border border-border/50 rounded-xl overflow-hidden hover:border-glow/40 transition-all card-lift"
             >
               <div className="relative aspect-[16/10] overflow-hidden">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={cover}
-                  alt={route.title}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                />
+                {cover ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={cover} alt={route.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                ) : (
+                  <div className="h-full w-full bg-gradient-to-br from-slate-800 to-slate-950" aria-label="线路尚无封面" />
+                )}
                 <div className="absolute inset-0 bg-gradient-to-t from-background/80 to-transparent" />
                 <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
                   <span className="text-[10px] uppercase tracking-widest font-mono text-glow/80">

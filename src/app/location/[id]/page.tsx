@@ -16,6 +16,7 @@ import { TimeSlider } from '@/components/astronomy/TimeSlider';
 import { SunPathDiagram } from '@/components/astronomy/SunPathDiagram';
 import { GoldenHourDisplay } from '@/components/astronomy/GoldenHourDisplay';
 import { PhotoGrid } from '@/components/shared/PhotoGrid';
+import { VerifiedPhoto } from '@/components/shared/VerifiedPhoto';
 import { locationDateTime } from '@/lib/location-time';
 import { getLocationProvenance } from '@/data/location-provenance';
 
@@ -61,11 +62,7 @@ export default function LocationDetailPage() {
     <div className="min-h-screen pb-12">
       {/* Hero */}
       <div className="relative h-[40vh] overflow-hidden">
-        <img
-          src={location.heroImage}
-          alt={location.name}
-          className="w-full h-full object-cover"
-        />
+        <VerifiedPhoto photo={location.photos[0]} alt={`${location.name}：${location.photos[0]?.caption ?? '地点照片待核验'}`} />
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/30 to-transparent" />
 
         {/* Back button */}
@@ -99,14 +96,14 @@ export default function LocationDetailPage() {
           <div className="bg-card rounded-xl p-4 border border-border/30">
             <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
               <Mountain className="w-3.5 h-3.5" />
-              海拔
+              目录海拔（待核验）
             </div>
             <p className="font-semibold text-lg">{location.elevation}m</p>
           </div>
           <div className="bg-card rounded-xl p-4 border border-border/30">
             <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
               <Compass className="w-3.5 h-3.5" />
-              难度
+              难度（参考）
             </div>
             <p className="font-semibold text-lg">
               {difficultyLabels[location.difficulty]}{' '}
@@ -116,7 +113,7 @@ export default function LocationDetailPage() {
           <div className="bg-card rounded-xl p-4 border border-border/30">
             <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
               <MapPin className="w-3.5 h-3.5" />
-              坐标
+              目录坐标（示意）
             </div>
             <p className="font-mono text-sm">
               {location.coordinates[1].toFixed(2)}°N, {location.coordinates[0].toFixed(2)}°E
@@ -125,7 +122,7 @@ export default function LocationDetailPage() {
           <div className="bg-card rounded-xl p-4 border border-border/30">
             <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
               <Star className="w-3.5 h-3.5" />
-              最佳季节
+              建议季节（待核验）
             </div>
             <p className="font-semibold">
               {location.bestSeasons.map((s) => seasonLabels[s]).join(' · ')}
@@ -143,6 +140,9 @@ export default function LocationDetailPage() {
             <div>
               <h2 className="text-xl font-semibold mb-2">关于此地</h2>
               <p className="text-muted-foreground leading-relaxed">{location.description}</p>
+              <Link href={`/scout?location=${location.id}`} className="mt-3 inline-flex rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
+                以此地点创建拍摄计划
+              </Link>
             </div>
 
             <div className="rounded-xl border border-border/30 p-4 text-xs text-muted-foreground space-y-2">
@@ -196,12 +196,22 @@ export default function LocationDetailPage() {
               />
             </div>
 
-            <ShootingPlanner key={location.id} location={location} onVantageChange={onVantageChange} />
+            <div id="shooting-plan" className="scroll-mt-24">
+              <ShootingPlanner key={location.id} location={location} onVantageChange={onVantageChange} />
+            </div>
             {/* Photo Grid */}
             <div>
-              <h3 className="text-lg font-semibold mb-3">示意图片</h3>
-              <p className="text-xs text-muted-foreground mb-3">来自 Unsplash 的主题示意，尚未核验为此地实拍。</p>
+              <h3 className="text-lg font-semibold mb-3">地点实拍与来源</h3>
+              <p className="text-xs text-muted-foreground mb-3">图片对应此地点或标明的子地点；图片坐标不等于已校准机位。点击可查看原始文件与许可。</p>
               <PhotoGrid photos={location.photos} locationName={location.name} />
+              {location.photos.length === 0 && <p className="text-sm text-muted-foreground">暂无可展示的已核验实拍。</p>}
+              {location.photos.map((photo) => (
+                <div key={photo.sourceUrl} className="mt-3 rounded-lg border border-border/30 p-3 text-xs text-muted-foreground">
+                  <p>{photo.caption} · 摄影：{photo.author} · <a href={photo.licenseUrl} target="_blank" rel="noopener noreferrer" className="underline">{photo.license}</a></p>
+                  <p className="mt-1">地点依据：{photo.placeEvidence}</p>
+                  <a href={photo.sourceUrl} target="_blank" rel="noopener noreferrer" className="mt-1 inline-block underline">查看 Wikimedia Commons 原始文件</a>
+                </div>
+              ))}
             </div>
           </div>
 

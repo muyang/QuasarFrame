@@ -90,6 +90,7 @@ export const shootingPlans = sqliteTable('shooting_plans', {
   setupMinutes: integer('setup_minutes').notNull(),
   notes: text('notes').notNull().default(''),
   dataVersion: text('data_version').notNull(),
+  workspace: text('workspace', { mode: 'json' }).$type<import('../lib/shooting-workspace').ShootingWorkspace>(),
   legacyFingerprint: text('legacy_fingerprint'),
   createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
   updatedAt: text('updated_at').notNull().default(sql`(datetime('now'))`),

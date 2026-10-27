@@ -16,6 +16,20 @@ export interface CameraPosition {
   focalLength: number;   // mm
 }
 
+export interface LocationMedia {
+  fileName: string;
+  fileHashPath: string;
+  imageUrl: string;
+  sourceUrl: string;
+  caption: string;
+  author: string;
+  license: string;
+  licenseUrl: string;
+  placeEvidence: string;
+  reviewedAt: string;
+  aiReferenceAllowed: false;
+}
+
 export interface Location {
   id: string;
   name: string;
@@ -31,7 +45,7 @@ export interface Location {
   description: string;
   descriptionEn: string;
   heroImage: string;
-  photos: string[];
+  photos: LocationMedia[];
   goldenHourOffset: number;       // minutes before/after official sunrise/set
   notes: string;
   notesEn: string;

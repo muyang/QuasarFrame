@@ -6,6 +6,7 @@
     "node": ">=22 <23"
   },
   "scripts": {
+    "maps:install": "node scripts/install-geolibre.mjs",
     "dev": "next dev --webpack",
     "build": "next build --webpack",
     "start": "next start",

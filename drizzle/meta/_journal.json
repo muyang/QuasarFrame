@@ -57,6 +57,13 @@
       "when": 1792717328957,
       "tag": "0007_regular_siren",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1792776496817,
+      "tag": "0008_ambiguous_quicksilver",
+      "breakpoints": true
     }
   ]
 }

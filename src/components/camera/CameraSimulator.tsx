@@ -12,6 +12,7 @@ interface Props {
   elevation: number;
   currentDate: Date;
   timeZone: string;
+  cameraHeightM?: number;
 }
 
 interface TerrainPreview {
@@ -36,19 +37,21 @@ function displayHeightAtOrigin(preview: TerrainPreview, lng: number, lat: number
     + (corners[2]! * (1 - dx) + corners[3]! * dx) * dy;
 }
 
-export function CameraSimulator({ locationId, coordinates, elevation, currentDate, timeZone }: Props) {
+export function CameraSimulator({ locationId, coordinates, elevation, currentDate, timeZone, cameraHeightM = 1.6 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<WebGLRenderer | null>(null);
   const sceneRef = useRef<Scene | null>(null);
   const cameraRef = useRef<PerspectiveCamera | null>(null);
   const synchronizeRef = useRef<(() => void) | null>(null);
   const [error, setError] = useState(false);
-  const [terrain, setTerrain] = useState<TerrainPreview | null>(null);
+  const [loadedTerrain, setTerrain] = useState<{ key: string; data: TerrainPreview | null } | null>(null);
   const [terrainStatus, setTerrainStatus] = useState<'loading' | 'available' | 'unavailable'>('loading');
   const { azimuth, elevation: cameraElevation, focalLength, sensor, portrait } = useCameraStore();
   const view = getCameraView(focalLength, sensor, portrait);
   const sunMoonData = useSunCalc(coordinates, currentDate, timeZone);
   const lng = coordinates[0], lat = coordinates[1];
+  const terrainKey = `${locationId}:${lng}:${lat}`;
+  const terrain = loadedTerrain?.key === terrainKey ? loadedTerrain.data : null;
 
   useEffect(() => {
     let active = true;
@@ -56,12 +59,12 @@ export function CameraSimulator({ locationId, coordinates, elevation, currentDat
       .then(async (response) => response.ok ? await response.json() as TerrainPreview : null)
       .then((data) => {
         if (!active) return;
-        setTerrain(data?.originSampleM === null ? null : data);
+        setTerrain({ key: terrainKey, data: data?.originSampleM === null ? null : data });
         setTerrainStatus(data?.originSampleM === null || !data ? 'unavailable' : 'available');
       })
-      .catch(() => { if (active) { setTerrain(null); setTerrainStatus('unavailable'); } });
+      .catch(() => { if (active) { setTerrain({ key: terrainKey, data: null }); setTerrainStatus('unavailable'); } });
     return () => { active = false; };
-  }, [locationId, lng, lat]);
+  }, [locationId, lng, lat, terrainKey]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -75,7 +78,7 @@ export function CameraSimulator({ locationId, coordinates, elevation, currentDat
       const scene = new THREE.Scene();
       scene.fog = new THREE.FogExp2(0x88aacc, terrain ? 0.000012 : 0.0008);
       const camera = new THREE.PerspectiveCamera(40, 1.5, 1, terrain ? 150000 : 50000);
-      camera.position.set(0, 2, 0);
+      camera.position.set(0, cameraHeightM, 0);
       const renderer = new THREE.WebGLRenderer({ antialias: true });
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -115,12 +118,7 @@ export function CameraSimulator({ locationId, coordinates, elevation, currentDat
       } else {
         geometry = new THREE.PlaneGeometry(20000, 20000, 64, 64);
         geometry.rotateX(-Math.PI / 2);
-        const positions = geometry.attributes.position;
-        for (let i = 0; i < positions.count; i++) {
-          const x = positions.getX(i), z = positions.getZ(i);
-          positions.setY(i, Math.sin(x * 0.001) * Math.cos(z * 0.001) * elevation * 0.4
-            + Math.sin(x * 0.003 + 1.5) * Math.cos(z * 0.004) * elevation * 0.2 - elevation * 0.3);
-        }
+
       }
       geometry.computeVertexNormals();
       scene.add(new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: 0x4a6b55, roughness: 0.9, flatShading: !terrain, side: THREE.DoubleSide })));
@@ -158,7 +156,7 @@ export function CameraSimulator({ locationId, coordinates, elevation, currentDat
     }
     initialize().catch(() => { if (!disposed) setError(true); });
     return () => { disposed = true; cleanup?.(); };
-  }, [lng, lat, elevation, terrain]);
+  }, [lng, lat, elevation, terrain, cameraHeightM]);
 
   useEffect(() => {
     const synchronize = () => {
@@ -183,13 +181,14 @@ export function CameraSimulator({ locationId, coordinates, elevation, currentDat
   }, [azimuth, cameraElevation, view.verticalFov, sunMoonData]);
 
   return <div>
-    <div ref={containerRef} style={{ aspectRatio: view.aspect }} className="w-full rounded-xl overflow-hidden bg-black border border-border/20">
+    <div ref={containerRef} style={{ aspectRatio: view.aspect }} className="relative w-full rounded-xl overflow-hidden bg-black border border-border/20">
+      {!terrain && <p className="absolute top-0 left-0 z-10 text-xs text-amber-400 bg-black/70 p-3">暂无真实地形画面 · 平面光位示意</p>}
       {error && <p className="text-sm text-muted-foreground p-4">此设备暂不能显示三维预览，请使用日照轨迹和视场参数。</p>}
     </div>
     {terrainStatus === 'available' && terrain ? <div className="text-xs text-muted-foreground mt-2 space-y-1">
       <p>Copernicus GLO-30 地表高程预览 · EGM2008 · {terrain.metadata.dataVersion}。三维网格经过缩略，机位坐标未核验，不能作为精确构图或导航结论。</p>
       {terrain.catalogueSampleM !== null && Math.abs(elevation - terrain.catalogueSampleM) > 100 && <p className="text-amber-600">注意：此示意坐标的地表高程约 {Math.round(terrain.catalogueSampleM)} 米，与目录标注的 {elevation} 米差异明显；请提供真实机位。</p>}
       <p>{terrain.metadata.attribution}</p>
-    </div> : <p className="text-xs text-muted-foreground mt-2">{terrainStatus === 'loading' ? '正在加载地形数据…' : '程序生成地形，仅用于理解视场与光线；此地点暂无可用的真实高程网格。'}</p>}
+    </div> : <p className="text-xs text-muted-foreground mt-2">{terrainStatus === 'loading' ? '正在加载地形数据…' : '此地点暂无可用的真实 DEM。画面仅显示平面与理论光位，不代表当地山形。'}</p>}
   </div>;
 }

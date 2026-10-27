@@ -28,7 +28,7 @@ export function getPlan(ownerId: string, id: string): CloudPlanRecord | null {
     travelMinutes: row.travelMinutes, setupMinutes: row.setupMinutes, notes: row.notes,
   };
   return {
-    id: row.id,
+    id: row.id, workspace: row.workspace ?? null,
     place: { id: place.id, catalogueId: place.catalogueId, name: place.name, status: place.status },
     plan,
     vantage: {
@@ -88,6 +88,7 @@ export function savePlan(ownerId: string, input: CloudPlanInput, existingId?: st
       heightAboveGroundM: input.subject.heightAboveGroundM, verifiedAt: null,
     }).run();
     const fields = {
+      workspace: input.workspace === undefined ? existing?.workspace ?? null : input.workspace,
       placeId: place.id, vantagePointId: vantageId, subjectId,
       title: input.plan.name, version: 2, coordinateSource: input.plan.coordinateSource,
       shotAt: locationDateTime(input.plan.dateKey, input.plan.minutes, input.plan.timeZone).toISOString(),

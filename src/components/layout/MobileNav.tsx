@@ -6,7 +6,7 @@ import { Globe, MapPin, Radio, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navItems = [
-  { href: '/scout', label: '选景', icon: Globe },
+  { href: '/scout', label: '工作台', icon: Globe },
   { href: '/discover', label: '发现', icon: MapPin },
   { href: '/feeds/live', label: '直播', icon: Radio },
   { href: '/profile', label: '我的', icon: User },

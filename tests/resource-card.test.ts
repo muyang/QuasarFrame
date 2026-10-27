@@ -52,7 +52,7 @@ test('目录只发布已安装资源，未知资源不成为公开能力', () =>
   try {
     process.env.TERRAIN_DATA_DIR = temporary;
     const catalog = listResourceCatalog();
-    assert.deepEqual(catalog.cards.map((card) => card.id), ['astronomy.sun-moon']);
+    assert.deepEqual(catalog.cards.map((card) => card.id), ['astronomy.sun-moon', 'map.nasa.blue-marble']);
     assert.deepEqual(catalog.unavailable, [{ id: 'terrain.dem.niubei', reason: 'data_not_installed' }]);
     assert.equal(getResourceCard('user.photo.private'), null);
     assert.equal(astronomyCard().quality.status, 'theoretical');

@@ -1,0 +1,47 @@
+{
+  "version": "0.2.0",
+  "name": "QuasarFrame · NASA Blue Marble",
+  "mapView": {
+    "center": [
+      102.35,
+      29.75
+    ],
+    "zoom": 3,
+    "bearing": 0,
+    "pitch": 0
+  },
+  "basemapStyleUrl": "",
+  "basemapVisible": false,
+  "basemapOpacity": 1,
+  "layers": [
+    {
+      "id": "nasa-blue-marble",
+      "name": "NASA Blue Marble · August 2004",
+      "type": "xyz",
+      "visible": true,
+      "opacity": 1,
+      "source": {
+        "type": "raster",
+        "tiles": [
+          "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/BlueMarble_ShadedRelief_Bathymetry/default/GoogleMapsCompatible_Level8/{z}/{y}/{x}.jpeg"
+        ],
+        "tileSize": 256,
+        "minzoom": 0,
+        "maxzoom": 8,
+        "attribution": "NASA Earth Observatory / MODIS · August 2004"
+      }
+    }
+  ],
+  "preferences": {
+    "map": {
+      "projection": "mercator",
+      "maxZoom": 18,
+      "showPointerElevation": false
+    }
+  },
+  "metadata": {
+    "source": "NASA GIBS",
+    "role": "overview-imagery",
+    "epoch": "2004-08"
+  }
+}

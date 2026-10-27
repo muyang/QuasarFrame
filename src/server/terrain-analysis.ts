@@ -1,25 +1,40 @@
 import * as SunCalc from 'suncalc';
 import { locations } from '@/data/locations';
 import { bodyAgainstHorizon, horizonFromProfile, terrainProfile, theoreticalLineOfSight } from '@/lib/geo';
+import { validateResourceRequest } from '@/lib/resource-card';
 import type { TerrainAnalysisInput } from '@/lib/terrain-analysis';
+import { terrainCardFromMetadata } from './resource-catalog';
 import { getTerrain } from './terrain';
 
 export function analyzeTerrain(locationId: string, input: TerrainAnalysisInput) {
   const terrain = getTerrain(locationId);
   if (!terrain) return null;
   const metadata = terrain.metadata;
+  const card = terrainCardFromMetadata(metadata);
   const origin = input.vantage.coordinates;
+  const contract = validateResourceRequest(card, {
+    operation: 'terrain.analyze.v1', access: 'public', coordinates: origin, horizontalCrs: 'EPSG:4326',
+    verticalDatum: input.vantage.elevationM === null ? null : input.vantage.verticalDatum,
+    at: input.at,
+  });
   const sample = terrain.sample;
-  const sampledOrigin = sample(...origin);
   const base = {
     dataVersion: metadata.dataVersion,
     dataset: metadata.dataset,
     verticalDatum: metadata.verticalDatum,
     horizontalDatum: metadata.horizontalDatum,
+    resource: {
+      cardId: card.id, cardVersion: card.version,
+      sourceUrl: card.provenance.sourceUrl, attribution: card.provenance.attribution,
+      contentSha256: card.provenance.contentSha256, qualityStatus: card.quality.status,
+    },
     coordinateStatus: input.vantage.coordinateSource === 'catalogue' ? 'illustrative' : 'unverified',
     fillMaskStatus: metadata.fillMaskStatus,
     uncertainty: 'DSM includes vegetation/buildings; no refraction, near-field objects, fill mask, or field calibration',
   };
+  if (!contract.ok && contract.reason === 'outside_coverage') return { ...base, status: 'outside_coverage' as const };
+  if (!contract.ok && contract.reason !== 'vertical_datum_mismatch') throw new Error(`Terrain resource contract rejected: ${contract.reason}`);
+  const sampledOrigin = sample(...origin);
   if (sampledOrigin === null) return { ...base, status: 'outside_coverage' as const };
   const catalogue = locations.find((item) => item.id === locationId);
   const catalogueDifferenceM = catalogue && origin[0] === catalogue.coordinates[0] && origin[1] === catalogue.coordinates[1]
@@ -28,7 +43,7 @@ export function analyzeTerrain(locationId: string, input: TerrainAnalysisInput) 
     return { ...base, status: 'illustrative_coordinate_mismatch' as const,
       sampledElevationM: sampledOrigin, catalogueDifferenceM };
   }
-  if (input.vantage.elevationM !== null && input.vantage.verticalDatum !== 'EGM2008') {
+  if (!contract.ok && contract.reason === 'vertical_datum_mismatch') {
     return { ...base, status: 'datum_mismatch' as const, sampledElevationM: sampledOrigin, catalogueDifferenceM };
   }
   const observerElevationM = input.vantage.elevationM ?? sampledOrigin;

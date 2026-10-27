@@ -26,6 +26,7 @@ test('cloud plans isolate owners, keep independent point provenance, and import 
         minutes: 420, timeZone: 'Asia/Shanghai', focalLength: 70, sensor: 'fullFrame',
         portrait: false, azimuth: 95, elevation: 5, travelMinutes: 60, setupMinutes: 30, notes: 'test',
       },
+      workspace: { version: 1, intent: 'astro', projection: 'globe', viewport: { center: [102.3, 29.88], zoom: 7, bearing: 75, pitch: 20 } },
       vantage: { name: '山顶 GPS', source: 'gps', horizontalAccuracyM: 12, elevationM: 3660,
         verticalDatum: 'EGM96', cameraHeightM: 1.6 },
       subject: { name: '雪峰', coordinates: [101.9, 29.6], source: 'user_input',
@@ -33,6 +34,7 @@ test('cloud plans isolate owners, keep independent point provenance, and import 
     });
     const created = savePlan('alice', input);
     assert.ok(created);
+    assert.deepEqual(created.workspace, input.workspace);
     assert.equal(created.place.status, 'illustrative');
     assert.equal(created.vantage.source, 'gps');
     assert.equal(created.vantage.horizontalAccuracyM, 12);
@@ -46,6 +48,11 @@ test('cloud plans isolate owners, keep independent point provenance, and import 
     assert.equal(deletePlan('bob', created.id), false);
 
     const changed = savePlan('alice', { ...input, plan: { ...input.plan, name: '已更新' }, subject: null }, created.id);
+    assert.deepEqual(changed?.workspace, input.workspace);
+    const { workspace: omitted, ...legacyClientInput } = input;
+    assert.ok(omitted);
+    assert.deepEqual(savePlan('alice', legacyClientInput, created.id)?.workspace, input.workspace, 'older planner must preserve workspace metadata');
+    assert.equal(savePlan('alice', { ...input, workspace: null }, created.id)?.workspace, null);
     assert.equal(changed?.plan.name, '已更新');
     assert.equal(changed?.subject, null);
     assert.equal(listPlans('alice', 'niubei').length, 1);

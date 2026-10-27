@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { workspaceSchema, type ShootingWorkspace } from './shooting-workspace';
 import { shootingPlanSchema } from './shooting-plan';
 
 const coordinate = z.tuple([z.number().finite().min(-180).max(180), z.number().finite().min(-90).max(90)]);
@@ -27,6 +28,7 @@ export const subjectInputSchema = z.object({
 
 export const cloudPlanInputSchema = z.object({
   plan: shootingPlanSchema,
+  workspace: workspaceSchema.nullable().optional(),
   vantage: vantageInputSchema,
   subject: subjectInputSchema.nullable().default(null),
 }).strict();
@@ -36,6 +38,7 @@ export type CloudPlanInput = z.infer<typeof cloudPlanInputSchema>;
 
 export interface CloudPlanRecord {
   id: string;
+  workspace: ShootingWorkspace | null;
   place: { id: string; catalogueId: string; name: string; status: 'illustrative' };
   plan: z.infer<typeof shootingPlanSchema>;
   vantage: {

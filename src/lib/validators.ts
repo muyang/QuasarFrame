@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { distributionScopeSchema } from './license';
 
 // ─── Auth ───
 export const registerSchema = z.object({
@@ -37,9 +38,11 @@ export const photoUploadSchema = z.object({
   shareCoordinates: z.boolean().default(false),
   priceType: z.enum(['free', 'paid']).default('free'),
   price: z.number().min(0).max(10000).default(0),
+  attestOwnership: z.boolean().optional(),
+  distributionScope: distributionScopeSchema.optional(),
 });
 
-export const photoUpdateSchema = photoUploadSchema.partial();
+export const photoUpdateSchema = photoUploadSchema.omit({ attestOwnership: true, distributionScope: true }).partial();
 
 // ─── Camera Feeds ───
 export const feedCreateSchema = z.object({

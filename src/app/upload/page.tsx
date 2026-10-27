@@ -7,6 +7,7 @@ import { Upload, CheckCircle } from 'lucide-react';
 import { PhotoUploader } from '@/components/upload/PhotoUploader';
 import { ShootingParamsForm } from '@/components/upload/ShootingParamsForm';
 import type { PhotoEvidence } from '@/lib/photo-evidence';
+import { noDistribution, type DistributionScope } from '@/lib/license';
 
 interface AnalysisResponse {
   evidence: PhotoEvidence;
@@ -27,6 +28,8 @@ export default function UploadPage() {
   const [error, setError] = useState('');
   const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
+  const [attestOwnership, setAttestOwnership] = useState(false);
+  const [licenseScope, setLicenseScope] = useState<DistributionScope>(noDistribution);
   const requestId = useRef(0);
   const [params, setParams] = useState({
     title: '',
@@ -60,6 +63,7 @@ export default function UploadPage() {
   const handleFileSelect = useCallback(async (selectedFile: File) => {
     const currentRequest = ++requestId.current;
     setFile(selectedFile);
+    setAttestOwnership(false); setLicenseScope(noDistribution);
     setError(''); setAnalysis(null); setAnalyzing(true);
     // Evidence and consent belong to one photo. Replacing it must not carry
     // coordinates or a prior sharing choice into the next submission.
@@ -104,6 +108,7 @@ export default function UploadPage() {
     setFile(null);
     setPreview(null);
     setAnalysis(null);
+    setAttestOwnership(false); setLicenseScope(noDistribution);
     setAnalyzing(false);
     setParams((current) => ({ ...current, locationId: '', coordinatesLng: '', coordinatesLat: '',
       shotAt: '', weather: '', cameraMake: '', cameraModel: '', lens: '', aperture: '',
@@ -118,6 +123,14 @@ export default function UploadPage() {
     }
     if (!params.title.trim()) {
       setError('请输入标题');
+      return;
+    }
+    if (!attestOwnership || !licenseScope.web) {
+      setError('请确认作品权利，并选择允许网页展示后再提交审核');
+      return;
+    }
+    if (params.priceType === 'paid' && !licenseScope.paid) {
+      setError('收费作品需明确选择允许收费展示');
       return;
     }
 
@@ -150,6 +163,8 @@ export default function UploadPage() {
           shareCoordinates: params.shareCoordinates,
           priceType: params.priceType,
           price: params.price ? parseFloat(params.price) : 0,
+          attestOwnership,
+          distributionScope: licenseScope,
         })
       );
 
@@ -226,6 +241,21 @@ export default function UploadPage() {
         {/* Right: Parameters */}
         <div className="max-h-[calc(100vh-12rem)] overflow-y-auto pr-2 scrollbar-thin">
           <ShootingParamsForm params={params} onChange={setParams} />
+        </div>
+      </div>
+
+      <div className="mt-8 rounded-xl border border-white/10 bg-white/5 p-4 space-y-3 text-sm">
+        <h2 className="font-medium">作品授权范围</h2>
+        <p className="text-white/60">授权申请会与作品一起送审；审核通过前不会据此公开原图或提供付费交付。电视、相框与再加工均需单独选择。</p>
+        <label className="flex gap-2 items-start"><input type="checkbox" checked={attestOwnership} onChange={(event) => setAttestOwnership(event.target.checked)} />我确认拥有此作品的相应权利，并同意提交以下使用范围供平台审核。</label>
+        <div className="grid grid-cols-2 gap-2 text-white/80">
+          {([
+            ['web', '网页展示'], ['mobile', '手机端展示'], ['tv', '电视端展示'],
+            ['frame', '数字相框展示'], ['paid', '允许收费展示'], ['download', '允许购买后下载'],
+            ['derivative', '允许平台再加工'],
+          ] as const).map(([key, label]) => <label className="flex gap-2 items-center" key={key}>
+            <input type="checkbox" checked={licenseScope[key]} onChange={(event) => setLicenseScope((current) => ({ ...current, [key]: event.target.checked }))} />{label}
+          </label>)}
         </div>
       </div>
 

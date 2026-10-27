@@ -2,14 +2,15 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Globe, MapPin, Camera, Sparkles, Tv, Map, Bell, Radio, User } from 'lucide-react';
+import { Globe, MapPin, Camera, Sparkles, Tv, Map, Bell, Radio, User, BookOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { UserNav } from '@/components/shared/UserAvatar';
 
 const navItems = [
   { href: '/', label: '首页', labelEn: 'Home', icon: Sparkles },
-  { href: '/scout', label: '选景', labelEn: 'Scout', icon: Globe },
+  { href: '/scout', label: '工作台', labelEn: 'Scout', icon: Globe },
   { href: '/discover', label: '发现', labelEn: 'Discover', icon: MapPin },
+  { href: '/knowledge', label: '知识', labelEn: 'Knowledge', icon: BookOpen },
   { href: '/feeds/live', label: '直播', labelEn: 'Live', icon: Radio },
   { href: '/profile', label: '我的', labelEn: 'Profile', icon: User },
 ];

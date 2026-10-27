@@ -4,7 +4,9 @@ import { NextResponse } from 'next/server';
 import { requireAuth, getUserId } from '@/auth/middleware';
 import { rateLimit, getClientIp } from '@/lib/rate-limit';
 import { db } from '@/db';
-import { photos, users, purchases, unlocks, commissions, userSubscriptions, membershipPlans } from '@/db/schema';
+import { photos, users, purchases, unlocks, commissions, userSubscriptions, membershipPlans, entitlementGrants } from '@/db/schema';
+import { latestSourceLicense, licensedFor } from '@/server/licenses';
+import { parseDistributionScope } from '@/lib/license';
 
 export async function POST(
   req: Request,
@@ -24,11 +26,24 @@ export async function POST(
       if (!photo || photo.status !== 'approved') throw new Error('作品不存在或尚未发布');
       if (photo.priceType === 'free') throw new Error('免费作品无需解锁');
       if (photo.userId === userId) throw new Error('自己的作品无需解锁');
+      const license = latestSourceLicense('photo', id);
+      if (!license || !licensedFor('photo', id, 'web', 'paid')) throw new Error('此作品尚无有效收费授权');
 
       const existing = tx.select({ id: unlocks.id }).from(unlocks).where(and(
         eq(unlocks.userId, userId), eq(unlocks.resourceType, 'photo'), eq(unlocks.resourceId, id)
       )).get();
-      if (existing) return 'already';
+      if (existing) {
+        const grant = tx.select({ id: entitlementGrants.id }).from(entitlementGrants).where(and(
+          eq(entitlementGrants.userId, userId), eq(entitlementGrants.resourceType, 'photo'),
+          eq(entitlementGrants.resourceId, id), eq(entitlementGrants.licenseId, license.id),
+        )).get();
+        if (!grant) tx.insert(entitlementGrants).values({
+          id: uuid(), userId, resourceType: 'photo', resourceId: id,
+          purchaseId: null, licenseId: license.id,
+          channelsJson: JSON.stringify(parseDistributionScope(license.scopeJson)?.mobile ? ['web', 'mobile'] : ['web']),
+        }).run();
+        return 'already';
+      }
 
       const sub = tx.select().from(userSubscriptions).where(and(
         eq(userSubscriptions.userId, userId),
@@ -40,6 +55,7 @@ export async function POST(
       const useSubscription = !!sub && !!plan &&
         (plan.maxDownloadsPerMonth === -1 || sub.downloadsUsed < plan.maxDownloadsPerMonth);
 
+      let purchaseId: string | null = null;
       if (useSubscription && sub) {
         tx.update(userSubscriptions)
           .set({ downloadsUsed: sql`${userSubscriptions.downloadsUsed} + 1` })
@@ -50,7 +66,7 @@ export async function POST(
           .where(and(eq(users.id, userId), gte(users.balance, photo.price))).run();
         if (debit.changes !== 1) throw new Error('余额不足，请先充值');
 
-        const purchaseId = uuid();
+        purchaseId = uuid();
         tx.insert(purchases).values({
           id: purchaseId, userId, resourceType: 'photo', resourceId: id,
           amount: photo.price, currency: 'CNY', paymentMethod: 'balance', status: 'completed',
@@ -68,6 +84,11 @@ export async function POST(
 
       tx.insert(unlocks).values({
         id: uuid(), userId, resourceType: 'photo', resourceId: id,
+      }).run();
+      tx.insert(entitlementGrants).values({
+        id: uuid(), userId, resourceType: 'photo', resourceId: id,
+        purchaseId, licenseId: license.id,
+        channelsJson: JSON.stringify(parseDistributionScope(license.scopeJson)?.mobile ? ['web', 'mobile'] : ['web']),
       }).run();
       tx.update(photos)
         .set({ downloadCount: sql`${photos.downloadCount} + 1` })

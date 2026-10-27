@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { eq } from 'drizzle-orm';
 import { db } from '@/db';
 import { users, photos } from '@/db/schema';
+import { licensedFor } from '@/server/licenses';
 
 // GET public user profile
 export async function GET(
@@ -28,20 +29,14 @@ export async function GET(
     return NextResponse.json({ error: '用户不存在' }, { status: 404 });
   }
 
-  // Get approved photo count
-  const [photoCount] = await db
-    .select({ count: photos.id })
-    .from(photos)
-    .where(eq(photos.userId, id));
-
-  // Count photos
   const photoList = await db
-    .select({ id: photos.id })
+    .select({ id: photos.id, priceType: photos.priceType, status: photos.status })
     .from(photos)
     .where(eq(photos.userId, id));
 
   return NextResponse.json({
     ...user,
-    photoCount: photoList.length,
+    photoCount: photoList.filter((photo) => photo.status === 'approved' && licensedFor('photo', photo.id,
+      'web', photo.priceType === 'paid' ? 'paid' : 'view')).length,
   });
 }

@@ -7,6 +7,7 @@ import { locations } from '@/data/locations';
 import { sceneryTypes } from '@/data/scenery-types';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
+import { VerifiedPhoto } from '@/components/shared/VerifiedPhoto';
 import { PRESET_CITIES } from '@/lib/constants';
 import {
   haversineDistance,
@@ -77,7 +78,7 @@ export default function NearbyPage() {
           </div>
         </div>
 
-        <p className="text-xs text-muted-foreground mb-4">内置点位与图片为待核验资料；尚未接入路线计算和现场气象。</p>
+        <p className="text-xs text-muted-foreground mb-4">图片已按地点来源核对；内置坐标仍是区域示意，尚未接入路线计算和现场气象。</p>
         {/* Location list */}
         <div className="space-y-4">
           {sortedLocations.map((loc, i) => {
@@ -88,11 +89,7 @@ export default function NearbyPage() {
                   <CardContent className="p-0 flex">
                     {/* Thumbnail */}
                     <div className="w-32 sm:w-40 aspect-square shrink-0 overflow-hidden">
-                      <img
-                        src={loc.heroImage}
-                        alt={loc.name}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                      />
+                      <VerifiedPhoto photo={loc.photos[0]} alt={`${loc.name}：${loc.photos[0]?.caption ?? '地点照片待核验'}`} />
                     </div>
 
                     {/* Info */}

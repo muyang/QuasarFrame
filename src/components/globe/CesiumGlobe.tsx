@@ -6,6 +6,7 @@ import { useLocationStore } from '@/stores/useLocationStore';
 import { locations } from '@/data/locations';
 import type { Location } from '@/types/location';
 import CesiumViewer from './CesiumViewer';
+import { VerifiedPhoto } from '@/components/shared/VerifiedPhoto';
 
 export function CesiumGlobe() {
   const router = useRouter();
@@ -35,11 +36,7 @@ export function CesiumGlobe() {
         <div className="absolute bottom-6 left-6 right-6 md:left-auto md:right-6 md:bottom-6 md:w-96 z-10 animate-in slide-in-from-bottom-4 duration-300">
           <div className="bg-card/95 backdrop-blur-xl rounded-2xl border border-border/50 shadow-2xl overflow-hidden">
             <div className="aspect-video overflow-hidden">
-              <img
-                src={selectedLoc.heroImage}
-                alt={selectedLoc.name}
-                className="w-full h-full object-cover"
-              />
+              <VerifiedPhoto photo={selectedLoc.photos[0]} alt={`${selectedLoc.name}：${selectedLoc.photos[0]?.caption ?? '地点照片待核验'}`} />
             </div>
             <div className="p-5">
               <div className="flex items-start justify-between">

@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { locations } from '@/data/locations';
 import { sceneryTypes } from '@/data/scenery-types';
 import { cn } from '@/lib/utils';
+import { VerifiedPhoto } from '@/components/shared/VerifiedPhoto';
 import { db } from '@/db';
 import { cameraFeeds } from '@/db/schema';
 import { eq, desc, and, inArray } from 'drizzle-orm';
@@ -101,11 +102,7 @@ export default async function HomePage() {
               <Link key={loc.id} href={`/location/${loc.id}`}>
                 <Card className="group overflow-hidden border-border/30 hover:border-primary/30 transition-all hover:shadow-lg hover:shadow-primary/5">
                   <div className="aspect-[4/3] overflow-hidden">
-                    <img
-                      src={loc.heroImage}
-                      alt={loc.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    />
+                    <VerifiedPhoto photo={loc.photos[0]} alt={`${loc.name}：${loc.photos[0]?.caption ?? '地点照片待核验'}`} />
                   </div>
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between">

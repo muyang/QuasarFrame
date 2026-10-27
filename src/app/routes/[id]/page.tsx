@@ -84,9 +84,7 @@ export default function RouteDetailPage() {
     );
   }
 
-  const cover = route.coverImage ||
-    (stops[0]?.locationId ? locations.find((l) => l.id === stops[0].locationId)?.heroImage : null) ||
-    'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=1200&q=80';
+  const cover = route.coverImage;
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
@@ -96,8 +94,12 @@ export default function RouteDetailPage() {
 
       {/* Hero */}
       <div className="relative aspect-[21/9] rounded-2xl overflow-hidden mb-8 border border-border/50">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={cover} alt={route.title} className="w-full h-full object-cover" />
+        {cover ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={cover} alt={route.title} className="w-full h-full object-cover" />
+        ) : (
+          <div className="h-full w-full bg-gradient-to-br from-slate-800 to-slate-950" aria-label="线路尚无封面" />
+        )}
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
         <div className="absolute bottom-0 left-0 right-0 p-6">
           <div className="flex items-center gap-2 text-xs text-glow mb-2 font-mono uppercase tracking-widest">

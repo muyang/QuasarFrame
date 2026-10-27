@@ -30,6 +30,14 @@ export interface TerrainAnalysisResult {
   dataVersion: string;
   dataset: string;
   verticalDatum: string;
+  resource?: {
+    cardId: string;
+    cardVersion: string;
+    sourceUrl: string;
+    attribution: string;
+    contentSha256: string | null;
+    qualityStatus: 'theoretical' | 'unverified_accuracy';
+  };
   coordinateStatus: 'illustrative' | 'unverified';
   sampledElevationM?: number;
   catalogueDifferenceM?: number | null;

@@ -2,8 +2,8 @@ import sharp from 'sharp';
 import { mkdir } from 'fs/promises';
 import path from 'path';
 
-const UPLOAD_DIR = path.join(process.cwd(), 'public', 'uploads');
 export const PRIVATE_IMAGE_DIR = path.join(process.cwd(), 'data', 'originals');
+export const PRIVATE_THUMBNAIL_DIR = path.join(process.cwd(), 'data', 'thumbnails');
 const THUMBNAIL_WIDTH = 400;
 const THUMBNAIL_QUALITY = 80;
 
@@ -11,8 +11,8 @@ export async function processAndSaveImage(
   fileBuffer: Buffer,
   photoId: string
 ): Promise<{ imageUrl: string; thumbnailUrl: string }> {
-  await mkdir(UPLOAD_DIR, { recursive: true });
   await mkdir(PRIVATE_IMAGE_DIR, { recursive: true });
+  await mkdir(PRIVATE_THUMBNAIL_DIR, { recursive: true });
 
   const fileName = `${photoId}.jpg`;
   const thumbFileName = `${photoId}_thumb.jpg`;
@@ -25,7 +25,7 @@ export async function processAndSaveImage(
     .jpeg({ quality: 95 })
     .toFile(originalPath);
 
-  const thumbPath = path.join(UPLOAD_DIR, thumbFileName);
+  const thumbPath = path.join(PRIVATE_THUMBNAIL_DIR, thumbFileName);
   await sharp(fileBuffer)
     .rotate()
     .resize(THUMBNAIL_WIDTH, null, { withoutEnlargement: true })
@@ -34,6 +34,6 @@ export async function processAndSaveImage(
 
   return {
     imageUrl: `/api/photos/${photoId}/image`,
-    thumbnailUrl: `/uploads/${thumbFileName}`,
+    thumbnailUrl: `/api/photos/${photoId}/thumbnail`,
   };
 }

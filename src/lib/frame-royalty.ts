@@ -1,7 +1,9 @@
-import { and, eq, gte, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, sql } from 'drizzle-orm';
 import { v4 as uuid } from 'uuid';
 import { db } from '@/db';
-import { frameSkus, frameContentBundles, photos, commissions } from '@/db/schema';
+import { frameSkus, frameContentBundles, photos, commissions, sourceLicenses, entitlementGrants } from '@/db/schema';
+import { parseDistributionScope, permitsDelivery } from '@/lib/license';
+import { licensedFor } from '@/server/licenses';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -30,6 +32,20 @@ function parseBundleRule(raw: string | null): RoyaltyRule {
   } catch {
     return { type: 'percent', value: 0.5 };
   }
+}
+
+export function parseBundlePhotoIds(raw: string): string[] {
+  const parsed: unknown = JSON.parse(raw);
+  if (!Array.isArray(parsed) || parsed.length > 100 || parsed.some((id) => typeof id !== 'string')
+    || new Set(parsed).size !== parsed.length) throw new Error('内容包作品列表无效');
+  return parsed as string[];
+}
+
+export function bundleDeliverable(raw: string): boolean {
+  try { return parseBundlePhotoIds(raw).every((id) =>
+    db.select({ status: photos.status }).from(photos).where(eq(photos.id, id)).get()?.status === 'approved'
+    && licensedFor('photo', id, 'frame', 'paid')); }
+  catch { return false; }
 }
 /** Resolve items + bundles, compute line amounts and total. Throws on invalid input. */
 export async function resolveOrderItems(
@@ -63,7 +79,8 @@ export async function resolveOrderItems(
       if (!b) throw new Error(`内容包 ${item.bundleId} 不存在`);
       if (b.status !== 'active') throw new Error(`内容包 ${b.name} 已下架`);
       bundlePrice = b.price;
-      photoIds = b.photoIds ? (JSON.parse(b.photoIds) as string[]) : [];
+      photoIds = parseBundlePhotoIds(b.photoIds);
+      if (!bundleDeliverable(b.photoIds)) throw new Error(`内容包 ${b.name} 含未获相框收费授权的作品`);
       royaltyRule = parseBundleRule(b.royaltyRule);
       bundleName = b.name;
     }
@@ -91,6 +108,7 @@ export async function resolveOrderItems(
 export function settleFrameOrderRoyalties(
   tx: Tx,
   purchaseId: string,
+  userId: string,
   lineItems: LineItem[]
 ) {
   for (const line of lineItems) {
@@ -102,6 +120,22 @@ export function settleFrameOrderRoyalties(
     if (stockUpdate.changes !== 1) throw new Error('商品库存不足，请刷新后重试');
 
     if (!line.bundleId || line.photoIds.length === 0) continue;
+
+    for (const photoId of line.photoIds) {
+      const photo = tx.select({ id: photos.id, status: photos.status }).from(photos).where(eq(photos.id, photoId)).get();
+      const license = tx.select().from(sourceLicenses).where(and(
+        eq(sourceLicenses.resourceType, 'photo'), eq(sourceLicenses.resourceId, photoId),
+      )).orderBy(desc(sourceLicenses.version)).get();
+      const scope = license ? parseDistributionScope(license.scopeJson) : null;
+      if (!photo || photo.status !== 'approved' || !license || !scope
+        || !permitsDelivery({ status: license.status, scope }, 'frame', 'paid')) {
+        throw new Error('内容包包含失效或未获授权的作品');
+      }
+      tx.insert(entitlementGrants).values({
+        id: uuid(), userId, resourceType: 'photo', resourceId: photoId,
+        purchaseId, licenseId: license.id, channelsJson: JSON.stringify(['frame']),
+      }).run();
+    }
 
     const royaltyPool =
       line.royaltyRule.type === 'percent'

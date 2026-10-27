@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { eq } from 'drizzle-orm';
 import { db } from '@/db';
 import { frameContentBundles } from '@/db/schema';
+import { bundleDeliverable, parseBundlePhotoIds } from '@/lib/frame-royalty';
 
 // GET — public list of active bundles
 export async function GET() {
@@ -12,9 +13,9 @@ export async function GET() {
     .orderBy(frameContentBundles.createdAt);
 
   return NextResponse.json({
-    bundles: bundles.map((b) => ({
+    bundles: bundles.filter((b) => bundleDeliverable(b.photoIds)).map((b) => ({
       ...b,
-      photoIds: b.photoIds ? JSON.parse(b.photoIds) : [],
+      photoIds: parseBundlePhotoIds(b.photoIds),
       royaltyRule: b.royaltyRule ? JSON.parse(b.royaltyRule) : { type: 'percent', value: 0.5 },
     })),
   });

@@ -1,16 +1,6 @@
-'use client';
+import { ShootingWorkbench } from '@/components/workspace/ShootingWorkbench';
 
-import dynamic from 'next/dynamic';
-
-const CesiumGlobe = dynamic(
-  () => import('@/components/globe/CesiumGlobe').then((m) => m.CesiumGlobe),
-  { ssr: false }
-);
-
-export default function ScoutPage() {
-  return (
-    <div className="h-[calc(100vh-4rem)] relative">
-      <CesiumGlobe />
-    </div>
-  );
+export default async function ScoutPage({ searchParams }: { searchParams: Promise<{ location?: string }> }) {
+  const { location } = await searchParams;
+  return <ShootingWorkbench key={location ?? 'niubei'} initialLocation={location ?? 'niubei'} />;
 }

@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { Check, X } from 'lucide-react';
+import Link from 'next/link';
 
 interface Photo {
   id: string;
@@ -14,6 +15,7 @@ interface Photo {
   price: number;
   author: { name: string; email: string };
   createdAt: string;
+  licenseStatus: string;
 }
 
 export default function AdminReviewPage() {
@@ -60,6 +62,7 @@ export default function AdminReviewPage() {
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
       <h1 className="text-2xl font-bold text-white mb-6">内容审核</h1>
+      <Link href="/admin/licenses" className="inline-block text-sm text-glow underline mb-6">审核作品分发授权</Link>
 
       {photos.length === 0 ? (
         <div className="text-center py-20 text-white/40">
@@ -82,6 +85,7 @@ export default function AdminReviewPage() {
                 <h3 className="text-white font-medium truncate">{photo.title}</h3>
                 <p className="text-white/40 text-sm mt-1">{photo.author.name}</p>
                 <p className="text-white/40 text-xs">{photo.author.email}</p>
+                <p className="text-amber-300/80 text-xs mt-2">分发许可：{photo.licenseStatus}；内容审核通过后仍需有效许可才会公开。</p>
                 <div className="mt-3 flex items-center gap-2">
                   <span className={`text-xs px-2 py-0.5 rounded ${photo.priceType === 'paid' ? 'bg-glow/20 text-glow' : 'bg-white/10 text-white/60'}`}>
                     {photo.priceType === 'paid' ? `¥${photo.price}` : '免费'}

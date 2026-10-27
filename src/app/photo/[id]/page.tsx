@@ -10,6 +10,7 @@ import {
   Eye, Heart, ArrowLeft, CheckCircle, Globe
 } from 'lucide-react';
 import { ShootingPositionIndicator } from '@/components/photos/ShootingPositionIndicator';
+import { PhotoEvidencePanel } from '@/components/photos/PhotoEvidencePanel';
 import { shootingGuidance, type PhotoProvenance } from '@/lib/photo-evidence';
 import { getCameraView, type SensorPreset } from '@/lib/camera-optics';
 
@@ -64,12 +65,15 @@ export default function PhotoDetailPage() {
 
   useEffect(() => {
     fetch(`/api/photos/${params.id}`)
-      .then((r) => r.json())
+      .then((r) => r.ok ? r.json() : null)
       .then((data) => {
         setPhoto(data);
         setLoading(false);
       })
-      .catch(() => setLoading(false));
+      .catch(() => {
+        setPhoto(null);
+        setLoading(false);
+      });
   }, [params.id]);
 
   async function handleUnlock() {
@@ -82,7 +86,7 @@ export default function PhotoDetailPage() {
       const res = await fetch(`/api/photos/${params.id}/unlock`, { method: 'POST' });
       if (res.ok) {
         // Reload photo data
-        const data = await fetch(`/api/photos/${params.id}`).then((r) => r.json());
+        const data = await fetch(`/api/photos/${params.id}`).then((r) => r.ok ? r.json() : null);
         setPhoto(data);
       } else {
         const err = await res.json();
@@ -300,6 +304,7 @@ export default function PhotoDetailPage() {
               : <p className="text-xs text-white/60">基本参数已具备；可在拍摄计划中调整时间、方向与地形剖面，现场光线和近景仍需试拍核对。</p>}
             {photo.isOwner && <p className="text-xs text-white/40">精确机位{photo.shareCoordinates ? '已允许在作品详情分享' : '仅自己可见'}。修改坐标后会重新关闭分享。</p>}
           </div>}
+          {photo.isOwner && <PhotoEvidencePanel photoId={photo.id} />}
 
           {/* Location link */}
           {photo.locationId && (
@@ -316,7 +321,7 @@ export default function PhotoDetailPage() {
           {photo.isUnlocked && (
             <div className="flex items-center gap-2 text-green-400 text-sm">
               <CheckCircle className="w-4 h-4" />
-              已解锁 — 可查看完整参数和下载原图
+              已解锁 — 可查看完整参数和原图
             </div>
           )}
         </div>
